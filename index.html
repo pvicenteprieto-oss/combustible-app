@@ -232,7 +232,10 @@ tr:last-child td{border-bottom:none}
           </div>
           <div class="row2">
             <div class="fg"><label>Equipo</label><select id="cc-equipo" onchange="onEquipoChange()"></select></div>
-            <div class="fg"><label>Operador / chofer</label><input id="cc-driver" placeholder="Nombre completo"/></div>
+            <div class="fg"><label>Operador / chofer</label>
+            <select id="cc-driver-sel" onchange="onChoferChange('cc-driver-sel','cc-driver-manual')"></select>
+            <input id="cc-driver-manual" placeholder="Escribí el nombre completo" style="margin-top:6px;display:none"/>
+          </div>
           </div>
           <div class="fg"><label>Contrato</label><select id="cc-contrato"><option value="">Sin contrato</option></select></div>
           <div class="oblig-box oblig-pend" id="medicion-box">Completá tacómetro o kilómetros (al menos uno).</div>
@@ -267,7 +270,10 @@ tr:last-child td{border-bottom:none}
             <div class="hint-box">Registrá la carga según la foto del remito enviada por el chofer.</div>
             <div class="row2">
               <div class="fg"><label>Equipo</label><select id="en-equipo"></select></div>
-              <div class="fg"><label>Operador / chofer</label><input id="en-driver" placeholder="Nombre completo"/></div>
+              <div class="fg"><label>Operador / chofer</label>
+                <select id="en-driver-sel" onchange="onChoferChange('en-driver-sel','en-driver-manual')"></select>
+                <input id="en-driver-manual" placeholder="Escribí el nombre completo" style="margin-top:6px;display:none"/>
+              </div>
             </div>
             <div class="row2">
               <div class="fg"><label>Litros</label><input id="en-liters" type="number" min="1" placeholder="0"/></div>
@@ -355,6 +361,16 @@ tr:last-child td{border-bottom:none}
           <div id="contratos-list"></div>
           <div class="sep"></div>
           <button class="btn sec" id="btn-add-contrato" onclick="showModal('modal-add-contrato')">+ Agregar contrato</button>
+        </div>
+      </div>
+
+      <!-- CHOFERES -->
+      <div id="sec-choferes" class="section">
+        <div class="raised">
+          <div class="raised-title">Choferes y operadores</div>
+          <div id="choferes-list"></div>
+          <div class="sep"></div>
+          <button class="btn sec" id="btn-add-chofer" onclick="showModal('modal-add-chofer')">+ Agregar chofer</button>
         </div>
       </div>
 
@@ -455,6 +471,27 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<div class="overlay" id="modal-add-chofer">
+  <div class="modal">
+    <div class="modal-title">Agregar chofer / operador <button class="modal-close" onclick="closeModal('modal-add-chofer')">✕</button></div>
+    <div class="row2">
+      <div class="fg"><label>Nombre completo</label><input id="ch-nombre" placeholder="Nombre y apellido"/></div>
+      <div class="fg"><label>Legajo / identificador (opcional)</label><input id="ch-legajo" placeholder="Ej: 1234"/></div>
+    </div>
+    <div class="fg"><label>Tipo</label>
+      <select id="ch-tipo">
+        <option value="chofer">Chofer</option>
+        <option value="operador">Operador de maquinaria</option>
+        <option value="ambos">Chofer y operador</option>
+      </select></div>
+    <div id="ch-alert"></div>
+    <div class="btn-row">
+      <button class="btn sec" onclick="closeModal('modal-add-chofer')">Cancelar</button>
+      <button class="btn pri" onclick="addChofer()">Agregar ↗</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="modal-add-usuario">
   <div class="modal">
     <div class="modal-title">Agregar usuario <button class="modal-close" onclick="closeModal('modal-add-usuario')">✕</button></div>
@@ -505,7 +542,7 @@ tr:last-child td{border-bottom:none}
 <script>
 const API='https://script.google.com/macros/s/AKfycbyxg1pw0DHIcLlItPWQgilTRBlp4ag9-8VM7wXaC2Ejam1Bhn5ZQRwGXXeCVzk7rVRb/exec';
 let currentUser=null,currentSection='panel',estTab='nueva',repEstTab='equipo';
-let S={config:{lowAlertPct:15,tolerance:25,minRecords:3,estacion:''},cisternas:[{id:'c1',nombre:'Cisterna 1',combustible:'Diesel común',capacidad:1500,current:0},{id:'c2',nombre:'Cisterna 2',combustible:'Diesel premium',capacidad:1500,current:0}],usuarios:[],equipos:[],cargas:[],recargas:[],ajustes:[],desvios:[],sesiones:[],cargas_estacion:[],contratos:[]};
+let S={config:{lowAlertPct:15,tolerance:25,minRecords:3,estacion:''},choferes:[],cisternas:[{id:'c1',nombre:'Cisterna 1',combustible:'Diesel común',capacidad:1500,current:0},{id:'c2',nombre:'Cisterna 2',combustible:'Diesel premium',capacidad:1500,current:0}],usuarios:[],equipos:[],cargas:[],recargas:[],ajustes:[],desvios:[],sesiones:[],cargas_estacion:[],contratos:[]};
 
 function getDeviceId(){let id=localStorage.getItem('dvc');if(!id){id='d'+Date.now().toString(36);localStorage.setItem('dvc',id);}return id;}
 function getDevice(){const ua=navigator.userAgent;if(/android/i.test(ua))return'Android';if(/iphone|ipad/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/mac/i.test(ua))return'Mac';return'Otro';}
@@ -552,6 +589,7 @@ const NAV_ITEMS=[
   {id:'estacion', label:'Estación',  icon:'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4', roles:['encargado','empresa','admin']},
   {id:'equipos',  label:'Equipos',   icon:'M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l3-3h7z M19 16l3-3V8a1 1 0 00-1-1h-5a1 1 0 00-1 1v8h4z', roles:['empresa','admin']},
   {id:'contratos',label:'Contratos', icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', roles:['empresa','admin']},
+  {id:'choferes', label:'Choferes',  icon:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', roles:['admin','empresa']},
   {id:'usuarios', label:'Usuarios',  icon:'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', roles:['admin']},
   {id:'sesiones', label:'Sesiones',  icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', roles:['admin']},
   {id:'config',   label:'Config',    icon:'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', roles:['admin']}
@@ -573,7 +611,7 @@ function show(id){
   document.querySelectorAll('.snav-item,.bnav-item').forEach(b=>b.classList.toggle('active',b.id===`snav-${id}`||b.id===`bnav-${id}`));
   currentSection=id;renderSection(id);
 }
-function renderSection(id){switch(id){case 'panel':renderPanel();break;case 'carga':renderFormCarga();break;case 'estacion':renderEstacion();break;case 'equipos':renderEquipos();break;case 'contratos':renderContratos();break;case 'usuarios':renderUsuarios();break;case 'sesiones':renderSesiones();break;case 'config':renderConfig();break;}}
+function renderSection(id){switch(id){case 'panel':renderPanel();break;case 'carga':renderFormCarga();break;case 'estacion':renderEstacion();break;case 'equipos':renderEquipos();break;case 'contratos':renderContratos();break;case 'choferes':renderChoferes();break;case 'usuarios':renderUsuarios();break;case 'sesiones':renderSesiones();break;case 'config':renderConfig();break;}}
 function showModal(id){document.getElementById(id).classList.add('open')}
 function closeModal(id){document.getElementById(id).classList.remove('open')}
 function setAlert(id,msg,type='o'){const el=document.getElementById(id);if(el)el.innerHTML=msg?`<div class="alert al-${type}">${msg}</div>`:'';}
@@ -591,6 +629,7 @@ async function loadAll(){
     S.sesiones=data.sesiones||[];
     S.cargas_estacion=data.cargas_estacion||[];
     S.contratos=data.contratos||[];
+    S.choferes=data.choferes||[];
     if(data.cisternas&&data.cisternas.length)S.cisternas=data.cisternas.map(c=>({...c,capacidad:+c.capacidad||1500,current:+c.current||0}));
     if(data.config&&data.config.lowAlertPct)S.config={...S.config,...data.config,lowAlertPct:+data.config.lowAlertPct||15,tolerance:+data.config.tolerance||25,minRecords:+data.config.minRecords||3};
     document.getElementById('loading-screen').style.display='none';document.getElementById('app-content').style.display='block';
@@ -665,6 +704,7 @@ function renderFormCarga(){
   const selCont=document.getElementById('cc-contrato');
   if(selCont)selCont.innerHTML='<option value="">Sin contrato</option>'+S.contratos.filter(c=>c.estado==='activo').map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
   if(!document.getElementById('cc-date').value)document.getElementById('cc-date').value=now();
+  buildChoferSelector('cc-driver-sel','cc-driver-manual');
   updateCuotaPanelCarga();
 }
 
@@ -701,8 +741,67 @@ function updateCuotaPanelCarga(){
   document.getElementById('cuota-panel').innerHTML=`<div style="margin-bottom:12px;padding:10px 12px;background:#f8f8f6;border-radius:8px"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><span style="font-weight:700;font-size:13px">${eq.plate}</span><span class="badge ${rem===0?'b-dan':rem<20?'b-warn':'b-ok'}">${rem===0?'Cuota agotada':rem+' L disponibles hoy'}</span><span class="type-chip ${TCLASS(eq.tipo)}">${TLABEL(eq.tipo)}</span></div><div class="prog-bar"><div class="prog-fill ${pct>=100?'over':''}" style="width:${pct}%"></div></div><div style="font-size:11px;color:#aaa;margin-top:4px">Cuota: ${eq.quota} L — Usado hoy: ${used.toFixed(0)} L</div>${p?`<div style="font-size:12px;color:#888;margin-top:4px">Consumo prom: <b>${p.median.toFixed(1)} L/h</b></div>`:''}</div>`;
 }
 
+// ── CHOFERES ─────────────────────────────────────────────
+function buildChoferSelector(selId, manualId){
+  const sel=document.getElementById(selId);
+  const manual=document.getElementById(manualId);
+  if(!sel)return;
+  sel.innerHTML='<option value="">-- Seleccioná chofer --</option>'+S.choferes.filter(c=>c.activo!=='false').map(c=>`<option value="${c.nombre}">${c.nombre}${c.legajo?' ('+c.legajo+')':''}</option>`).join('')+'<option value="__otro__">Otro / ingresar manualmente</option>';
+  if(manual)manual.style.display='none';
+}
+function onChoferChange(selId, manualId){
+  const val=document.getElementById(selId).value;
+  const manual=document.getElementById(manualId);
+  if(manual)manual.style.display=val==='__otro__'?'':'none';
+  if(val!=='__otro__'&&manual)manual.value='';
+}
+function getChoferValue(selId, manualId){
+  const val=document.getElementById(selId)?.value||'';
+  if(val==='__otro__')return document.getElementById(manualId)?.value.trim()||'';
+  return val;
+}
+function renderChoferes(){
+  const adm=currentUser.rol==='admin';
+  document.getElementById('btn-add-chofer').style.display=adm?'':'none';
+  document.getElementById('choferes-list').innerHTML=S.choferes.length?S.choferes.map(c=>`
+    <div class="item-card">
+      <div class="ic-row">
+        <div>
+          <div class="ic-title">${c.nombre}${c.legajo?' <span style="font-size:12px;color:#888;font-weight:400">Leg. ${c.legajo}</span>':''}</div>
+          <div class="ic-sub">${{chofer:'Chofer',operador:'Operador de maquinaria',ambos:'Chofer y operador'}[c.tipo]||c.tipo}</div>
+        </div>
+        ${adm?`<button class="btn sec" style="padding:4px 10px;font-size:12px;color:#A32D2D" onclick="removeChofer('${c.id}')">Quitar</button>`:''}
+      </div>
+    </div>`).join(''):`<div class="msg">Sin choferes registrados.</div>`;
+}
+async function addChofer(){
+  const nombre=document.getElementById('ch-nombre').value.trim();
+  const legajo=document.getElementById('ch-legajo').value.trim();
+  const tipo=document.getElementById('ch-tipo').value;
+  if(!nombre){setAlert('ch-alert','Ingresá el nombre completo.','w');return;}
+  if(S.choferes.find(c=>c.nombre.toLowerCase()===nombre.toLowerCase())){setAlert('ch-alert','Ya existe un chofer con ese nombre.','d');return;}
+  const ch={id:uid(),nombre,legajo,tipo,activo:'true'};
+  try{
+    await api({action:'addChofer',data:JSON.stringify(ch)});
+    S.choferes.push(ch);closeModal('modal-add-chofer');renderChoferes();
+    buildChoferSelector('cc-driver-sel','cc-driver-manual');
+    buildChoferSelector('en-driver-sel','en-driver-manual');
+    ['ch-nombre','ch-legajo'].forEach(id=>document.getElementById(id).value='');
+  }catch(e){setAlert('ch-alert','Error: '+e.message,'d');}
+}
+async function removeChofer(id){
+  if(!confirm('¿Quitar este chofer?'))return;
+  try{
+    await api({action:'deleteChofer',id});
+    S.choferes=S.choferes.filter(c=>c.id!==id);
+    renderChoferes();
+    buildChoferSelector('cc-driver-sel','cc-driver-manual');
+    buildChoferSelector('en-driver-sel','en-driver-manual');
+  }catch(e){alert('Error: '+e.message);}
+}
+
 async function registrarCargaCisterna(){
-  const cisternaId=document.getElementById('cc-cisterna').value,eqId=document.getElementById('cc-equipo').value,driver=document.getElementById('cc-driver').value.trim(),liters=+document.getElementById('cc-liters').value,taco=document.getElementById('cc-taco').value.trim(),km=document.getElementById('cc-km').value.trim(),jstart=document.getElementById('cc-jstart').value,date=document.getElementById('cc-date').value||now(),obs=document.getElementById('cc-obs').value.trim(),contratoId=document.getElementById('cc-contrato').value;
+  const cisternaId=document.getElementById('cc-cisterna').value,eqId=document.getElementById('cc-equipo').value,driver=getChoferValue('cc-driver-sel','cc-driver-manual'),liters=+document.getElementById('cc-liters').value,taco=document.getElementById('cc-taco').value.trim(),km=document.getElementById('cc-km').value.trim(),jstart=document.getElementById('cc-jstart').value,date=document.getElementById('cc-date').value||now(),obs=document.getElementById('cc-obs').value.trim(),contratoId=document.getElementById('cc-contrato').value;
   const btn=document.getElementById('btn-reg-cisterna');
   if(!eqId||!driver||!liters||liters<=0){setAlert('carga-alert','Completá equipo, operador y litros.','w');return;}
   if(!checkMedicion()){setAlert('carga-alert','Completá al menos tacómetro o kilómetros.','d');return;}
@@ -724,6 +823,9 @@ async function registrarCargaCisterna(){
     if(desv){await api({action:'addDesvio',data:JSON.stringify(desv)});S.desvios.push(desv);setAlert('carga-alert',`Registrado con alerta de consumo ${desv.tipo} (${desv.desvPct>0?'+':''}${desv.desvPct.toFixed(0)}%). Verificar.`,'d');}
     else setAlert('carga-alert','Carga registrada correctamente.','o');
     ['cc-liters','cc-taco','cc-km','cc-jstart','cc-obs'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('cc-driver-sel').value='';
+    document.getElementById('cc-driver-manual').value='';
+    document.getElementById('cc-driver-manual').style.display='none';
     document.getElementById('carga-preview').innerHTML='';checkMedicion();renderFormCarga();
     if(!document.getElementById('carga-alert').innerHTML.includes('alerta'))clearAfter('carga-alert');
   }catch(e){setAlert('carga-alert','Error: '+e.message,'d');}
@@ -745,10 +847,11 @@ function renderEstacion(){
   const selCont=document.getElementById('en-contrato');
   if(selCont)selCont.innerHTML='<option value="">Sin contrato</option>'+S.contratos.filter(c=>c.estado==='activo').map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
   if(!document.getElementById('en-date').value)document.getElementById('en-date').value=now();
+  buildChoferSelector('en-driver-sel','en-driver-manual');
 }
 
 async function registrarCargaEstacion(){
-  const eqId=document.getElementById('en-equipo').value,driver=document.getElementById('en-driver').value.trim(),liters=+document.getElementById('en-liters').value,fuel=document.getElementById('en-fuel').value,contratoId=document.getElementById('en-contrato').value,receipt=document.getElementById('en-receipt').value.trim(),price=+document.getElementById('en-price').value||0,date=document.getElementById('en-date').value||now(),obs=document.getElementById('en-obs').value.trim();
+  const eqId=document.getElementById('en-equipo').value,driver=getChoferValue('en-driver-sel','en-driver-manual'),liters=+document.getElementById('en-liters').value,fuel=document.getElementById('en-fuel').value,contratoId=document.getElementById('en-contrato').value,receipt=document.getElementById('en-receipt').value.trim(),price=+document.getElementById('en-price').value||0,date=document.getElementById('en-date').value||now(),obs=document.getElementById('en-obs').value.trim();
   if(!eqId||!driver||!liters||liters<=0){setAlert('en-alert','Completá equipo, operador y litros.','w');return;}
   const eq=S.equipos.find(e=>e.id===eqId);
   const contrato=S.contratos.find(c=>c.id===contratoId);
@@ -757,7 +860,10 @@ async function registrarCargaEstacion(){
     await api({action:'addCargaEstacion',data:JSON.stringify(reg)});
     S.cargas_estacion.push(reg);
     setAlert('en-alert','Carga en estación registrada correctamente.','o');
-    ['en-driver','en-liters','en-receipt','en-price','en-obs'].forEach(id=>document.getElementById(id).value='');
+    ['en-liters','en-receipt','en-price','en-obs'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('en-driver-sel').value='';
+    document.getElementById('en-driver-manual').value='';
+    document.getElementById('en-driver-manual').style.display='none';
     clearAfter('en-alert');
   }catch(e){setAlert('en-alert','Error: '+e.message,'d');}
 }
