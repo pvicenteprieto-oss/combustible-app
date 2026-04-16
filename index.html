@@ -175,7 +175,11 @@ tr:last-child td{border-bottom:none}
       <button class="pin-key del" onclick="pinDel()">⌫</button>
     </div>
     <div class="login-error" id="login-error"></div>
-    <div style="font-size:11px;color:#ccc;margin-top:8px">Usuario inicial: <b>admin</b> · PIN: <b>1234</b></div>
+    <div id="login-loading" style="font-size:12px;color:#888;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px">
+      <div style="width:12px;height:12px;border:2px solid #eee;border-top-color:#185FA5;border-radius:50%;animation:spin 0.7s linear infinite"></div>
+      Conectando con el sistema...
+    </div>
+    <div id="login-ready" style="font-size:11px;color:#ccc;margin-top:8px;display:none">Usuario inicial: <b>admin</b> · PIN: <b>1234</b></div>
   </div>
 </div>
 
@@ -514,7 +518,7 @@ async function api(params){
 
 // ── LOGIN ────────────────────────────────────────────────
 let pinBuf='';
-function pinKey(d){if(pinBuf.length>=4)return;pinBuf+=d;updatePinDots();if(pinBuf.length===4)setTimeout(tryLogin,150);}
+function pinKey(d){if(!loginReady||pinBuf.length>=4)return;pinBuf+=d;updatePinDots();if(pinBuf.length===4)setTimeout(tryLogin,150);}
 function pinDel(){pinBuf=pinBuf.slice(0,-1);updatePinDots();document.getElementById('login-error').textContent='';}
 function updatePinDots(){for(let i=0;i<4;i++)document.getElementById('pd'+i).classList.toggle('filled',i<pinBuf.length);}
 
@@ -902,7 +906,29 @@ async function saveConfig(){
 }
 
 // ── INIT ─────────────────────────────────────────────────
-(async()=>{try{const data=await api({action:'getAll'});S.usuarios=data.usuarios||[];}catch(e){}})(  );
+let loginReady=false;
+function setLoginReady(){
+  loginReady=true;
+  document.getElementById('login-loading').style.display='none';
+  document.getElementById('login-ready').style.display='block';
+  document.querySelectorAll('.pin-key').forEach(b=>b.disabled=false);
+}
+document.querySelectorAll('.pin-key').forEach(b=>b.disabled=true);
+(async()=>{
+  let tries=0;
+  while(tries<5){
+    try{
+      const data=await api({action:'getAll'});
+      S.usuarios=data.usuarios||[];
+      setLoginReady();
+      return;
+    }catch(e){
+      tries++;
+      await new Promise(r=>setTimeout(r,2000));
+    }
+  }
+  setLoginReady();
+})();
 setInterval(()=>{if(currentUser)loadAll();},60000);
 </script>
 </body>
