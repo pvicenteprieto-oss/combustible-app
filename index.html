@@ -605,10 +605,45 @@ tr:last-child td{border-bottom:none}
     </div>
   </div>
 </div>
+<!-- MODAL EDITAR CARGA -->
+<div class="overlay" id="modal-edit-carga">
+  <div class="modal">
+    <div class="modal-title">Editar carga <button class="modal-close" onclick="closeModal('modal-edit-carga')">✕</button></div>
+    <div class="hint-box" id="edit-info" style="margin-bottom:12px"></div>
+    <input type="hidden" id="edit-id"/>
+    <input type="hidden" id="edit-fuente"/>
+    <input type="hidden" id="edit-litros-orig"/>
+    <input type="hidden" id="edit-cisterna-id"/>
+    <div class="row2">
+      <div class="fg"><label>Equipo</label><select id="edit-equipo"></select></div>
+      <div class="fg"><label>Chofer / operador</label>
+        <select id="edit-chofer-sel" onchange="onChoferChange('edit-chofer-sel','edit-chofer-manual')"></select>
+        <input id="edit-chofer-manual" placeholder="Nombre completo" style="margin-top:6px;display:none"/>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="fg"><label>Litros</label><input id="edit-litros" type="number" min="1" placeholder="0"/></div>
+      <div class="fg"><label>Contrato</label><select id="edit-contrato"><option value="">Sin contrato</option></select></div>
+    </div>
+    <div class="row2">
+      <div class="fg"><label>Fecha y hora</label><input id="edit-fecha" type="datetime-local"/></div>
+      <div class="fg"><label>Tacómetro (hs)</label><input id="edit-taco" type="number" step="0.1" placeholder="0.0"/></div>
+    </div>
+    <div class="fg"><label>Kilómetros</label><input id="edit-km" type="number" placeholder="0"/></div>
+    <div class="fg"><label>Observaciones</label><input id="edit-obs" placeholder="Opcional"/></div>
+    <div class="fg"><label>Motivo de la modificación</label><input id="edit-motivo" placeholder="Obligatorio — explicá el motivo del cambio"/></div>
+    <div id="edit-alert"></div>
+    <div class="btn-row">
+      <button class="btn sec" onclick="closeModal('modal-edit-carga')">Cancelar</button>
+      <button class="btn pri" onclick="guardarEditCarga()">Guardar cambios ↗</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API='https://script.google.com/macros/s/AKfycbyxg1pw0DHIcLlItPWQgilTRBlp4ag9-8VM7wXaC2Ejam1Bhn5ZQRwGXXeCVzk7rVRb/exec';
-let currentUser=null,currentSection='panel',estTab='nueva',repEstTab='equipo';
-let S={config:{lowAlertPct:15,tolerance:25,minRecords:3,estacion:''},choferes:[],estacion_saldo:{litros:0},depositos:[],cisternas:[{id:'c1',nombre:'Cisterna 1',combustible:'Diesel común',capacidad:1500,current:0},{id:'c2',nombre:'Cisterna 2',combustible:'Diesel premium',capacidad:1500,current:0}],usuarios:[],equipos:[],cargas:[],recargas:[],ajustes:[],desvios:[],sesiones:[],cargas_estacion:[],contratos:[]};
+let currentUser=null,currentSection='panel',estTab='nueva',repEstTab='equipo',_saving=false;
+let S={config:{lowAlertPct:15,tolerance:25,minRecords:3,estacion:''},choferes:[],estacion_saldo:{litros:0},depositos:[],auditoria:[],cisternas:[{id:'c1',nombre:'Cisterna 1',combustible:'Diesel común',capacidad:1500,current:0},{id:'c2',nombre:'Cisterna 2',combustible:'Diesel premium',capacidad:1500,current:0}],usuarios:[],equipos:[],cargas:[],recargas:[],ajustes:[],desvios:[],sesiones:[],cargas_estacion:[],contratos:[]};
 
 function getDeviceId(){let id=localStorage.getItem('dvc');if(!id){id='d'+Date.now().toString(36);localStorage.setItem('dvc',id);}return id;}
 function getDevice(){const ua=navigator.userAgent;if(/android/i.test(ua))return'Android';if(/iphone|ipad/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/mac/i.test(ua))return'Mac';return'Otro';}
@@ -698,6 +733,7 @@ async function loadAll(){
     S.contratos=data.contratos||[];
     S.choferes=data.choferes||[];
     S.depositos=data.depositos||[];
+    S.auditoria=data.auditoria||[];
     if(data.estacion_saldo&&data.estacion_saldo.litros!==undefined)S.estacion_saldo=data.estacion_saldo;
     if(data.cisternas&&data.cisternas.length)S.cisternas=data.cisternas.map(c=>({...c,capacidad:+c.capacidad||1500,current:+c.current||0}));
     if(data.config&&data.config.lowAlertPct)S.config={...S.config,...data.config,lowAlertPct:+data.config.lowAlertPct||15,tolerance:+data.config.tolerance||25,minRecords:+data.config.minRecords||3};
@@ -896,6 +932,7 @@ async function removeChofer(id){
 }
 
 async function registrarCargaCisterna(){
+  if(_saving)return;_saving=true;setTimeout(()=>_saving=false,5000);
   const cisternaId=document.getElementById('cc-cisterna').value,eqId=document.getElementById('cc-equipo').value,driver=getChoferValue('cc-driver-sel','cc-driver-manual'),liters=+document.getElementById('cc-liters').value,taco=document.getElementById('cc-taco').value.trim(),km=document.getElementById('cc-km').value.trim(),jstart=document.getElementById('cc-jstart').value,date=document.getElementById('cc-date').value||now(),obs=document.getElementById('cc-obs').value.trim(),contratoId=document.getElementById('cc-contrato').value;
   const btn=document.getElementById('btn-reg-cisterna');
   if(!eqId||!driver||!liters||liters<=0){setAlert('carga-alert','Completá equipo, operador y litros.','w');return;}
@@ -924,7 +961,7 @@ async function registrarCargaCisterna(){
     document.getElementById('carga-preview').innerHTML='';checkMedicion();renderFormCarga();
     if(!document.getElementById('carga-alert').innerHTML.includes('alerta'))clearAfter('carga-alert');
   }catch(e){setAlert('carga-alert','Error: '+e.message,'d');}
-  btn.disabled=false;btn.innerHTML='Registrar carga ↗';
+  btn.disabled=false;btn.innerHTML='Registrar carga ↗';_saving=false;
 }
 
 // ── CARGAS (historial completo) ──────────────────────────
@@ -1027,7 +1064,7 @@ function renderCargas(){
       <thead><tr>
         <th>Fecha</th><th>Equipo</th><th>Chofer</th><th>Litros</th>
         <th>Combustible</th><th>Fuente</th><th>Contrato</th>
-        <th>Tacóm.</th><th>Km</th><th>Registrado por</th><th>Detalle / Obs</th>
+        <th>Tacóm.</th><th>Km</th><th>Registrado por</th><th>Detalle / Obs</th><th>Acciones</th>
       </tr></thead>
       <tbody>${all.map(l=>`<tr>
         <td style="white-space:nowrap">${fdt(l.fecha)}</td>
@@ -1046,6 +1083,10 @@ function renderCargas(){
         <td>${l.km||'-'}</td>
         <td>${l.registradoPor||'-'}</td>
         <td style="color:#aaa;font-size:12px">${l.detalle||l.obs||'-'}</td>
+        <td style="white-space:nowrap">${['Cisterna','Estación'].includes(l.fuente)?`
+          <button class="btn sec" style="padding:3px 8px;font-size:11px" onclick="abrirEditCarga('${l.id}','${l.fuente}')">Editar</button>
+          <button class="btn sec" style="padding:3px 8px;font-size:11px;color:#A32D2D;margin-left:4px" onclick="eliminarCarga('${l.id}','${l.fuente}')">Eliminar</button>
+        `:'—'}</td>
       </tr>`).join('')}
       </tbody>
     </table></div>`:`<div class="msg">Sin cargas para los filtros aplicados.</div>`;
@@ -1080,6 +1121,7 @@ function renderEstacion(){
 }
 
 async function registrarCargaEstacion(){
+  if(_saving)return;_saving=true;setTimeout(()=>_saving=false,5000);
   const eqId=document.getElementById('en-equipo').value,driver=getChoferValue('en-driver-sel','en-driver-manual'),liters=+document.getElementById('en-liters').value,fuel=document.getElementById('en-fuel').value,contratoId=document.getElementById('en-contrato').value,receipt=document.getElementById('en-receipt').value.trim(),price=+document.getElementById('en-price').value||0,date=document.getElementById('en-date').value||now(),obs=document.getElementById('en-obs').value.trim();
   if(!eqId||!driver||!liters||liters<=0){setAlert('en-alert','Completá equipo, operador y litros.','w');return;}
   const eq=S.equipos.find(e=>e.id===eqId);
@@ -1316,6 +1358,164 @@ document.querySelectorAll('.pin-key').forEach(b=>b.disabled=true);
   }
   setLoginReady();
 })();
+// ── EDITAR / ELIMINAR CARGAS ─────────────────────────────
+function abrirEditCarga(id, fuente){
+  const carga = fuente==='Cisterna'
+    ? S.cargas.find(l=>l.id===id)
+    : S.cargas_estacion.find(l=>l.id===id);
+  if(!carga){alert('Carga no encontrada.');return;}
+
+  document.getElementById('edit-id').value=id;
+  document.getElementById('edit-fuente').value=fuente;
+  document.getElementById('edit-litros-orig').value=carga.liters||carga.litros||0;
+  document.getElementById('edit-cisterna-id').value=carga.cisternaId||'';
+  document.getElementById('edit-litros').value=carga.liters||carga.litros||0;
+  document.getElementById('edit-fecha').value=carga.date||carga.fecha||'';
+  document.getElementById('edit-taco').value=carga.tacometer||'';
+  document.getElementById('edit-km').value=carga.km||'';
+  document.getElementById('edit-obs').value=carga.obs||'';
+  document.getElementById('edit-motivo').value='';
+
+  // Info de la carga
+  const eq=S.equipos.find(e=>e.id===(carga.equipoId));
+  document.getElementById('edit-info').textContent=
+    `Carga original: ${eq?eq.plate:carga.plate||'-'} — ${carga.driver||'-'} — ${(+carga.liters||+carga.litros||0).toFixed(0)} L — ${fdt(carga.date||carga.fecha)}`;
+
+  // Poblar selectores
+  const selEq=document.getElementById('edit-equipo');
+  selEq.innerHTML=S.equipos.map(e=>`<option value="${e.id}" ${e.id===(carga.equipoId)?'selected':''}>${e.plate} — ${TLABEL(e.tipo)}</option>`).join('');
+
+  buildChoferSelector('edit-chofer-sel','edit-chofer-manual');
+  const selCh=document.getElementById('edit-chofer-sel');
+  // Seleccionar el chofer actual
+  const choferActual=carga.driver||'';
+  const optExists=[...selCh.options].find(o=>o.value===choferActual);
+  if(optExists) selCh.value=choferActual;
+  else if(choferActual){selCh.value='__otro__';document.getElementById('edit-chofer-manual').value=choferActual;document.getElementById('edit-chofer-manual').style.display='';}
+
+  const selCont=document.getElementById('edit-contrato');
+  selCont.innerHTML='<option value="">Sin contrato</option>'+S.contratos.filter(c=>c.estado==='activo').map(c=>`<option value="${c.id}" ${c.id===(carga.contratoId)?'selected':''}>${c.nombre}</option>`).join('');
+
+  setAlert('edit-alert','');
+  showModal('modal-edit-carga');
+}
+
+async function guardarEditCarga(){
+  const id=document.getElementById('edit-id').value;
+  const fuente=document.getElementById('edit-fuente').value;
+  const litrosOrig=+document.getElementById('edit-litros-orig').value||0;
+  const cisternaId=document.getElementById('edit-cisterna-id').value;
+  const litrosNew=+document.getElementById('edit-litros').value||0;
+  const motivo=document.getElementById('edit-motivo').value.trim();
+
+  if(!litrosNew||litrosNew<=0){setAlert('edit-alert','Ingresá los litros.','w');return;}
+  if(!motivo){setAlert('edit-alert','El motivo de la modificación es obligatorio.','w');return;}
+
+  const eqId=document.getElementById('edit-equipo').value;
+  const chofer=getChoferValue('edit-chofer-sel','edit-chofer-manual');
+  const contratoId=document.getElementById('edit-contrato').value;
+  const fecha=document.getElementById('edit-fecha').value;
+  const taco=document.getElementById('edit-taco').value.trim();
+  const km=document.getElementById('edit-km').value.trim();
+  const obs=document.getElementById('edit-obs').value.trim();
+  const eq=S.equipos.find(e=>e.id===eqId);
+  const contrato=S.contratos.find(c=>c.id===contratoId);
+
+  // Calcular diferencia de litros
+  const diff=litrosNew-litrosOrig;
+
+  // Registro de auditoría
+  const audit={
+    id:uid(), fecha:now(), tipo:'modificacion', fuente,
+    cargaId:id, usuario:currentUser.nombre||currentUser.username,
+    motivo, litrosAntes:litrosOrig, litrosDespues:litrosNew,
+    cambios:`Litros: ${litrosOrig}→${litrosNew} | Equipo: ${eq?.plate||eqId} | Chofer: ${chofer}`
+  };
+
+  try{
+    if(fuente==='Cisterna'){
+      const carga=S.cargas.find(l=>l.id===id);
+      const updated={...carga, equipoId:eqId, plate:eq?.plate||carga.plate,
+        driver:chofer, liters:litrosNew, tacometer:taco, km, obs,
+        contratoId:contratoId||'', contratoNombre:contrato?contrato.nombre:'', date:fecha,
+        modificadoPor:currentUser.nombre||currentUser.username, fechaModif:now()};
+      await api({action:'updateCarga', data:JSON.stringify(updated)});
+      Object.assign(carga, updated);
+      // Ajustar nivel cisterna
+      if(diff!==0){
+        const cist=S.cisternas.find(c=>c.id===cisternaId);
+        if(cist){
+          const newLevel=Math.max(0, cist.current - diff);
+          await api({action:'updateCisterna', id:cisternaId, value:newLevel});
+          cist.current=newLevel;
+        }
+      }
+    } else {
+      const carga=S.cargas_estacion.find(l=>l.id===id);
+      const updated={...carga, equipoId:eqId, plate:eq?.plate||carga.plate,
+        driver:chofer, liters:litrosNew, obs,
+        contratoId:contratoId||'', contratoNombre:contrato?contrato.nombre:'', date:fecha,
+        modificadoPor:currentUser.nombre||currentUser.username, fechaModif:now()};
+      await api({action:'updateCargaEstacion', data:JSON.stringify(updated)});
+      Object.assign(carga, updated);
+      // Ajustar saldo estación
+      if(diff!==0){
+        const newSaldo=Math.max(0, parseFloat(((S.estacion_saldo?.litros||0) - diff).toFixed(2)));
+        await api({action:'updateEstacionSaldo', value:newSaldo});
+        S.estacion_saldo={litros:newSaldo};
+      }
+    }
+    // Guardar auditoría
+    await api({action:'addAuditoria', data:JSON.stringify(audit)});
+    S.auditoria.push(audit);
+    closeModal('modal-edit-carga');
+    renderCargas();renderPanel();
+  }catch(e){setAlert('edit-alert','Error: '+e.message,'d');}
+}
+
+async function eliminarCarga(id, fuente){
+  const carga = fuente==='Cisterna'
+    ? S.cargas.find(l=>l.id===id)
+    : S.cargas_estacion.find(l=>l.id===id);
+  if(!carga){alert('Carga no encontrada.');return;}
+  const litros=+carga.liters||+carga.litros||0;
+  const eq=S.equipos.find(e=>e.id===carga.equipoId);
+  const motivo=prompt(`¿Eliminar carga de ${litros} L — ${eq?.plate||carga.plate||'-'} — ${fdt(carga.date||carga.fecha)}?\n\nIngresá el motivo de la eliminación (obligatorio):`);
+  if(motivo===null)return; // canceló
+  if(!motivo.trim()){alert('El motivo es obligatorio.');return;}
+
+  const audit={
+    id:uid(), fecha:now(), tipo:'eliminacion', fuente,
+    cargaId:id, usuario:currentUser.nombre||currentUser.username,
+    motivo:motivo.trim(), litrosAntes:litros, litrosDespues:0,
+    cambios:`Eliminación de carga de ${litros} L — ${eq?.plate||'-'} — ${carga.driver||'-'}`
+  };
+
+  try{
+    if(fuente==='Cisterna'){
+      await api({action:'deleteCarga', id});
+      S.cargas=S.cargas.filter(l=>l.id!==id);
+      // Devolver litros a la cisterna
+      const cist=S.cisternas.find(c=>c.id===carga.cisternaId);
+      if(cist){
+        const newLevel=Math.min(cist.capacidad, cist.current + litros);
+        await api({action:'updateCisterna', id:carga.cisternaId, value:newLevel});
+        cist.current=newLevel;
+      }
+    } else {
+      await api({action:'deleteCargaEstacion', id});
+      S.cargas_estacion=S.cargas_estacion.filter(l=>l.id!==id);
+      // Devolver litros al saldo estación
+      const newSaldo=parseFloat(((S.estacion_saldo?.litros||0) + litros).toFixed(2));
+      await api({action:'updateEstacionSaldo', value:newSaldo});
+      S.estacion_saldo={litros:newSaldo};
+    }
+    await api({action:'addAuditoria', data:JSON.stringify(audit)});
+    S.auditoria.push(audit);
+    renderCargas();renderPanel();
+  }catch(e){alert('Error: '+e.message);}
+}
+
 setInterval(async()=>{
   if(!currentUser)return;
   try{
@@ -1330,6 +1530,7 @@ setInterval(async()=>{
     S.contratos=data.contratos||[];
     S.choferes=data.choferes||[];
     S.depositos=data.depositos||[];
+    S.auditoria=data.auditoria||[];
     if(data.estacion_saldo&&data.estacion_saldo.litros!==undefined)S.estacion_saldo=data.estacion_saldo;
     if(data.cisternas&&data.cisternas.length)S.cisternas=data.cisternas.map(c=>({...c,capacidad:+c.capacidad||1500,current:+c.current||0}));
     if(data.config&&data.config.lowAlertPct)S.config={...S.config,...data.config,lowAlertPct:+data.config.lowAlertPct||15,tolerance:+data.config.tolerance||25,minRecords:+data.config.minRecords||3};
