@@ -1035,7 +1035,30 @@ document.querySelectorAll('.pin-key').forEach(b=>b.disabled=true);
   }
   setLoginReady();
 })();
-setInterval(()=>{if(currentUser)loadAll();},60000);
+setInterval(async()=>{
+  if(!currentUser)return;
+  try{
+    const data=await api({action:'getAll'});
+    S.usuarios=data.usuarios||[];
+    S.equipos=(data.camiones||[]).map(e=>({...e,quota:+e.quota||80,hasTacometer:String(e.hasTacometer)==='true'||e.hasTacometer==='1'}));
+    S.cargas=(data.cargas||[]).map(l=>({...l,liters:+l.liters||0,horasJornada:+l.horasJornada||0}));
+    S.recargas=data.recargas||[];S.ajustes=data.ajustes||[];
+    S.desvios=(data.desvios||[]).map(d=>({...d,actual:+d.actual||0,esperado:+d.esperado||0,desvPct:+d.desvPct||0}));
+    S.sesiones=data.sesiones||[];
+    S.cargas_estacion=data.cargas_estacion||[];
+    S.contratos=data.contratos||[];
+    S.choferes=data.choferes||[];
+    if(data.cisternas&&data.cisternas.length)S.cisternas=data.cisternas.map(c=>({...c,capacidad:+c.capacidad||1500,current:+c.current||0}));
+    if(data.config&&data.config.lowAlertPct)S.config={...S.config,...data.config,lowAlertPct:+data.config.lowAlertPct||15,tolerance:+data.config.tolerance||25,minRecords:+data.config.minRecords||3};
+    // Solo rerenderizar si NO estamos en carga o estacion (para no pisar lo que el usuario está completando)
+    if(currentSection!=='carga'&&currentSection!=='estacion'){
+      renderSection(currentSection);
+    } else {
+      // Solo actualizar el panel de cisterna en el header si estamos en carga
+      if(currentSection==='carga') updateCuotaPanelCarga();
+    }
+  }catch(e){}
+},60000);
 </script>
 </body>
 </html>
