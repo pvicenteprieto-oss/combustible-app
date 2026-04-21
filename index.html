@@ -280,11 +280,13 @@ tr:last-child td{border-bottom:none}
               <input id="hf-desde" type="date"/></div>
             <div class="fg" style="min-width:110px;margin:0"><label>Hasta</label>
               <input id="hf-hasta" type="date"/></div>
-            <div class="fg" style="min-width:100px;margin:0"><label>Fuente</label>
+            <div class="fg" style="min-width:100px;margin:0"><label>Tipo</label>
               <select id="hf-fuente">
-                <option value="">Todas</option>
-                <option value="Cisterna">Cisterna</option>
-                <option value="Estación">Estación</option>
+                <option value="">Todos</option>
+                <option value="Cisterna">Carga cisterna</option>
+                <option value="Estación">Carga estación</option>
+                <option value="Recarga cisterna">Recarga cisterna</option>
+                <option value="Depósito estación">Depósito estación</option>
               </select></div>
             <div class="fg" style="flex:1;min-width:130px;margin:0"><label>Cisterna</label>
               <select id="hf-cisterna"><option value="">Todas</option></select></div>
@@ -962,6 +964,23 @@ function renderCargas(){
   const hasta=document.getElementById('hf-hasta')?.value||'';
 
   let all=[
+    ...S.recargas.map(l=>{
+      const c=S.cisternas.find(x=>x.id===l.cisternaId);
+      return{
+        id:l.id, fecha:l.date, equipo:'-', equipoId:'', chofer:'-',
+        litros:+l.liters||0, combustible:c?c.combustible:'-',
+        contrato:'', contratoId:'', cisternaId:l.cisternaId||'',
+        tacometro:'', km:'', obs:l.obs||'', fuente:'Recarga cisterna',
+        registradoPor:l.resp||'', detalle:`${c?c.nombre:'-'} — $${(+l.price||0).toFixed(2)}/L`
+      };
+    }),
+    ...S.depositos.map(l=>({
+      id:l.id, fecha:l.fecha, equipo:'-', equipoId:'', chofer:'-',
+      litros:+l.litros||0, combustible:'Varios',
+      contrato:'', contratoId:'', cisternaId:'',
+      tacometro:'', km:'', obs:l.obs||'', fuente:'Depósito estación',
+      registradoPor:l.usuario||'', detalle:`$${(+l.monto||0).toLocaleString('es-AR')} a $${(+l.precio||0).toFixed(2)}/L`
+    })),
     ...S.cargas.map(l=>({
       id:l.id, fecha:l.date, equipo:l.plate||S.equipos.find(e=>e.id===l.equipoId)?.plate||'-',
       equipoId:l.equipoId, chofer:l.driver, litros:+l.liters||0,
@@ -969,7 +988,7 @@ function renderCargas(){
       contrato:l.contratoNombre||'', contratoId:l.contratoId||'',
       cisternaId:l.cisternaId||'',
       tacometro:l.tacometer||'', km:l.km||'', obs:l.obs||'', fuente:'Cisterna',
-      registradoPor:l.registradoPor||''
+      registradoPor:l.registradoPor||'', detalle:''
     })),
     ...S.cargas_estacion.map(l=>({
       id:l.id, fecha:l.date, equipo:l.plate||S.equipos.find(e=>e.id===l.equipoId)?.plate||'-',
@@ -977,7 +996,7 @@ function renderCargas(){
       combustible:FLABEL(l.combustible)||'-',
       contrato:l.contratoNombre||'', contratoId:l.contratoId||'',
       tacometro:'', km:'', obs:l.obs||'', fuente:'Estación', remito:l.receipt||'',
-      registradoPor:l.registradoPor||''
+      registradoPor:l.registradoPor||'', detalle:l.receipt?`Remito: ${l.receipt}`:''
     }))
   ];
 
@@ -996,16 +1015,19 @@ function renderCargas(){
   // Ordenar por fecha desc
   all.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
 
-  const totalL=all.reduce((a,b)=>a+b.litros,0);
-  const totalCist=all.filter(l=>l.fuente==='Cisterna').reduce((a,b)=>a+b.litros,0);
-  const totalEst=all.filter(l=>l.fuente==='Estación').reduce((a,b)=>a+b.litros,0);
+  const cargas_only=all.filter(l=>l.fuente==='Cisterna'||l.fuente==='Estación');
+  const totalL=cargas_only.reduce((a,b)=>a+b.litros,0);
+  const totalCist=cargas_only.filter(l=>l.fuente==='Cisterna').reduce((a,b)=>a+b.litros,0);
+  const totalEst=cargas_only.filter(l=>l.fuente==='Estación').reduce((a,b)=>a+b.litros,0);
+  const totalRecargado=all.filter(l=>l.fuente==='Recarga cisterna').reduce((a,b)=>a+b.litros,0);
+  const totalDepositado=all.filter(l=>l.fuente==='Depósito estación').reduce((a,b)=>a+b.litros,0);
 
   document.getElementById('cargas-table').innerHTML=all.length?`
     <div class="tbl-wrap"><table>
       <thead><tr>
         <th>Fecha</th><th>Equipo</th><th>Chofer</th><th>Litros</th>
         <th>Combustible</th><th>Fuente</th><th>Contrato</th>
-        <th>Tacóm.</th><th>Km</th><th>Registrado por</th><th>Obs</th>
+        <th>Tacóm.</th><th>Km</th><th>Registrado por</th><th>Detalle / Obs</th>
       </tr></thead>
       <tbody>${all.map(l=>`<tr>
         <td style="white-space:nowrap">${fdt(l.fecha)}</td>
@@ -1013,22 +1035,29 @@ function renderCargas(){
         <td>${l.chofer}</td>
         <td>${l.litros.toFixed(0)} L</td>
         <td>${l.combustible}</td>
-        <td><span class="badge ${l.fuente==='Cisterna'?'b-info':'b-teal'}">${l.fuente}</span></td>
+        <td><span class="badge ${{
+          'Cisterna':'b-info',
+          'Estación':'b-teal',
+          'Recarga cisterna':'b-purple',
+          'Depósito estación':'b-ok'
+        }[l.fuente]||'b-gray'}">${l.fuente}</span></td>
         <td>${l.contrato||'-'}</td>
         <td>${l.tacometro||'-'}</td>
         <td>${l.km||'-'}</td>
         <td>${l.registradoPor||'-'}</td>
-        <td style="color:#aaa;font-size:12px">${l.obs||'-'}</td>
+        <td style="color:#aaa;font-size:12px">${l.detalle||l.obs||'-'}</td>
       </tr>`).join('')}
       </tbody>
     </table></div>`:`<div class="msg">Sin cargas para los filtros aplicados.</div>`;
 
   document.getElementById('cargas-totals').innerHTML=all.length?`
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <div class="chip">Total: <b>${totalL.toFixed(0)} L</b></div>
+      <div class="chip">Despachado: <b>${totalL.toFixed(0)} L</b></div>
       <div class="chip">Cisterna: <b>${totalCist.toFixed(0)} L</b></div>
       <div class="chip">Estación: <b>${totalEst.toFixed(0)} L</b></div>
-      <div class="chip">Operaciones: <b>${all.length}</b></div>
+      ${totalRecargado>0?`<div class="chip">Recargado: <b>${totalRecargado.toFixed(0)} L</b></div>`:''}
+      ${totalDepositado>0?`<div class="chip">Depositado: <b>${totalDepositado.toFixed(0)} L</b></div>`:''}
+      <div class="chip">Movimientos: <b>${all.length}</b></div>
     </div>`:''  ;
 }
 
