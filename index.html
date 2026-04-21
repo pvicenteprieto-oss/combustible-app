@@ -1,20 +1,4 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<meta name="theme-color" content="#185FA5"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
-<meta name="apple-mobile-web-app-title" content="Ecopetro Combustible"/>
-<link rel="manifest" href="manifest.json"/>
-<title>Sistema de Control de Combustible Ecopetro SA</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:#f5f5f3;color:#1a1a1a;font-size:15px;-webkit-tap-highlight-color:transparent}
-.login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem}
-.login-box{background:#fff;border:1px solid #e8e8e8;border-radius:14px;padding:2rem;width:100%;max-width:340px;text-align:center}
-.login-logo-img{height:90px;width:auto;margin-bottom:12px}
+
 .login-title{font-size:13px;font-weight:700;color:#1a1a1a;margin-bottom:1.5rem;line-height:1.4}
 .login-field{text-align:left;margin-bottom:14px}
 .login-field label{font-size:12px;color:#666;font-weight:600;display:block;margin-bottom:4px}
@@ -727,24 +711,65 @@ function setAlert(id,msg,type='o'){const el=document.getElementById(id);if(el)el
 function clearAfter(id,ms=3000){setTimeout(()=>setAlert(id,''),ms)}
 
 // ── LOAD ────────────────────────────────────────────────
+// ── CACHÉ LOCAL ──────────────────────────────────────────
+const CACHE_KEY='ecopetro_cache';
+const CACHE_TTL=5*60*1000; // 5 minutos
+
+function saveCache(data){
+  try{localStorage.setItem(CACHE_KEY,JSON.stringify({ts:Date.now(),data}));}catch(e){}
+}
+function loadCache(){
+  try{
+    const raw=localStorage.getItem(CACHE_KEY);
+    if(!raw)return null;
+    const {ts,data}=JSON.parse(raw);
+    if(Date.now()-ts>CACHE_TTL)return null; // expirado
+    return data;
+  }catch(e){return null;}
+}
+function clearCache(){
+  try{localStorage.removeItem(CACHE_KEY);}catch(e){}
+}
+function applyData(data){
+  S.usuarios=data.usuarios||[];
+  S.equipos=(data.camiones||[]).map(e=>({...e,quota:+e.quota||80,hasTacometer:String(e.hasTacometer)==='true'||e.hasTacometer==='1'}));
+  S.cargas=(data.cargas||[]).map(l=>({...l,liters:+l.liters||0,horasJornada:+l.horasJornada||0}));
+  S.recargas=data.recargas||[];S.ajustes=data.ajustes||[];
+  S.desvios=(data.desvios||[]).map(d=>({...d,actual:+d.actual||0,esperado:+d.esperado||0,desvPct:+d.desvPct||0}));
+  S.sesiones=data.sesiones||[];
+  S.cargas_estacion=data.cargas_estacion||[];
+  S.contratos=data.contratos||[];
+  S.choferes=data.choferes||[];
+  S.depositos=data.depositos||[];
+  S.auditoria=data.auditoria||[];
+  if(data.estacion_saldo&&data.estacion_saldo.litros!==undefined)S.estacion_saldo=data.estacion_saldo;
+  if(data.cisternas&&data.cisternas.length)S.cisternas=data.cisternas.map(c=>({...c,capacidad:+c.capacidad||1500,current:+c.current||0}));
+  if(data.config&&data.config.lowAlertPct)S.config={...S.config,...data.config,lowAlertPct:+data.config.lowAlertPct||15,tolerance:+data.config.tolerance||25,minRecords:+data.config.minRecords||3};
+}
+
 async function loadAll(){
+  // Intentar mostrar datos cacheados primero
+  const cached=loadCache();
+  if(cached){
+    applyData(cached);
+    document.getElementById('loading-screen').style.display='none';
+    document.getElementById('app-content').style.display='block';
+    renderSection(currentSection);
+    // Actualizar en segundo plano sin bloquear la UI
+    api({action:'getAll'}).then(data=>{
+      applyData(data);
+      saveCache(data);
+      renderSection(currentSection);
+    }).catch(()=>{});
+    return;
+  }
+  // Sin caché: esperar la respuesta normal
   try{
     const data=await api({action:'getAll'});
-    S.usuarios=(data.usuarios||[]);
-    S.equipos=(data.camiones||[]).map(e=>({...e,quota:+e.quota||80,hasTacometer:String(e.hasTacometer)==='true'||e.hasTacometer==='1'}));
-    S.cargas=(data.cargas||[]).map(l=>({...l,liters:+l.liters||0,horasJornada:+l.horasJornada||0}));
-    S.recargas=data.recargas||[];S.ajustes=data.ajustes||[];
-    S.desvios=(data.desvios||[]).map(d=>({...d,actual:+d.actual||0,esperado:+d.esperado||0,desvPct:+d.desvPct||0}));
-    S.sesiones=data.sesiones||[];
-    S.cargas_estacion=data.cargas_estacion||[];
-    S.contratos=data.contratos||[];
-    S.choferes=data.choferes||[];
-    S.depositos=data.depositos||[];
-    S.auditoria=data.auditoria||[];
-    if(data.estacion_saldo&&data.estacion_saldo.litros!==undefined)S.estacion_saldo=data.estacion_saldo;
-    if(data.cisternas&&data.cisternas.length)S.cisternas=data.cisternas.map(c=>({...c,capacidad:+c.capacidad||1500,current:+c.current||0}));
-    if(data.config&&data.config.lowAlertPct)S.config={...S.config,...data.config,lowAlertPct:+data.config.lowAlertPct||15,tolerance:+data.config.tolerance||25,minRecords:+data.config.minRecords||3};
-    document.getElementById('loading-screen').style.display='none';document.getElementById('app-content').style.display='block';
+    applyData(data);
+    saveCache(data);
+    document.getElementById('loading-screen').style.display='none';
+    document.getElementById('app-content').style.display='block';
     renderSection(currentSection);
   }catch(e){document.getElementById('loading-screen').innerHTML=`<div style="color:#A32D2D;text-align:center;padding:2rem"><b>Error al conectar</b><br><small>${e.message}</small><br><br><button class="btn" onclick="loadAll()">Reintentar</button></div>`;}
 }
@@ -940,6 +965,7 @@ async function removeChofer(id){
 
 async function registrarCargaCisterna(){
   if(_saving)return;_saving=true;setTimeout(()=>_saving=false,5000);
+  clearCache();
   const cisternaId=document.getElementById('cc-cisterna').value,eqId=document.getElementById('cc-equipo').value,driver=getChoferValue('cc-driver-sel','cc-driver-manual'),liters=+document.getElementById('cc-liters').value,taco=document.getElementById('cc-taco').value.trim(),km=document.getElementById('cc-km').value.trim(),jstart=document.getElementById('cc-jstart').value,date=document.getElementById('cc-date').value||now(),obs=document.getElementById('cc-obs').value.trim(),contratoId=document.getElementById('cc-contrato').value;
   const btn=document.getElementById('btn-reg-cisterna');
   if(!eqId||!driver||!liters||liters<=0){setAlert('carga-alert','Completá equipo, operador y litros.','w');return;}
@@ -1137,6 +1163,7 @@ function renderEstacion(){
 
 async function registrarCargaEstacion(){
   if(_saving)return;_saving=true;setTimeout(()=>_saving=false,5000);
+  clearCache();
   const eqId=document.getElementById('en-equipo').value,driver=getChoferValue('en-driver-sel','en-driver-manual'),liters=+document.getElementById('en-liters').value,fuel=document.getElementById('en-fuel').value,contratoId=document.getElementById('en-contrato').value,receipt=document.getElementById('en-receipt').value.trim(),price=+document.getElementById('en-price').value||0,date=document.getElementById('en-date').value||now(),obs=document.getElementById('en-obs').value.trim();
   if(!eqId||!driver||!liters||liters<=0){setAlert('en-alert','Completá equipo, operador y litros.','w');return;}
   const eq=S.equipos.find(e=>e.id===eqId);
@@ -1546,6 +1573,7 @@ async function eliminarCarga(id, fuente){
 
 setInterval(async()=>{
   if(!currentUser)return;
+  clearCache(); // forzar datos frescos en el refresh periódico
   try{
     const data=await api({action:'getAll'});
     S.usuarios=data.usuarios||[];
