@@ -290,6 +290,13 @@ tr:last-child td{border-bottom:none}
               </select></div>
             <div class="fg" style="flex:1;min-width:130px;margin:0"><label>Cisterna</label>
               <select id="hf-cisterna"><option value="">Todas</option></select></div>
+            <div class="fg" style="min-width:90px;margin:0"><label>Mostrar</label>
+              <select id="hf-limit">
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="0">Todas</option>
+              </select></div>
             <button class="btn sec" onclick="renderCargas()">Filtrar</button>
           </div>
           <div id="cargas-table"></div>
@@ -1051,6 +1058,9 @@ function renderCargas(){
 
   // Ordenar por fecha desc
   all.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const limit=+document.getElementById('hf-limit')?.value||20;
+  const totalMovimientos=all.length;
+  if(limit>0) all=all.slice(0,limit);
 
   const cargas_only=all.filter(l=>l.fuente==='Cisterna'||l.fuente==='Estación');
   const totalL=cargas_only.reduce((a,b)=>a+b.litros,0);
@@ -1083,9 +1093,14 @@ function renderCargas(){
         <td>${l.km||'-'}</td>
         <td>${l.registradoPor||'-'}</td>
         <td style="color:#aaa;font-size:12px">${l.detalle||l.obs||'-'}</td>
-        <td style="white-space:nowrap">${['Cisterna','Estación'].includes(l.fuente)?`
-          <button class="btn sec" style="padding:3px 8px;font-size:11px" onclick="abrirEditCarga('${l.id}','${l.fuente}')">Editar</button>
-          <button class="btn sec" style="padding:3px 8px;font-size:11px;color:#A32D2D;margin-left:4px" onclick="eliminarCarga('${l.id}','${l.fuente}')">Eliminar</button>
+        <td>${['Cisterna','Estación'].includes(l.fuente)?`
+          <div style="position:relative;display:inline-block">
+            <button class="btn sec" style="padding:4px 10px;font-size:16px;line-height:1" onclick="toggleMenu('menu-${l.id}')">⋮</button>
+            <div id="menu-${l.id}" style="display:none;position:absolute;right:0;top:100%;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:50;min-width:130px;overflow:hidden">
+              <button onclick="abrirEditCarga('${l.id}','${l.fuente}');toggleMenu('menu-${l.id}')" style="display:block;width:100%;padding:10px 16px;text-align:left;border:none;background:#fff;cursor:pointer;font-size:13px;color:#1a1a1a">Editar</button>
+              <button onclick="eliminarCarga('${l.id}','${l.fuente}');toggleMenu('menu-${l.id}')" style="display:block;width:100%;padding:10px 16px;text-align:left;border:none;background:#fff;cursor:pointer;font-size:13px;color:#A32D2D;border-top:1px solid #f0f0f0">Eliminar</button>
+            </div>
+          </div>
         `:'—'}</td>
       </tr>`).join('')}
       </tbody>
@@ -1098,7 +1113,7 @@ function renderCargas(){
       <div class="chip">Estación: <b>${totalEst.toFixed(0)} L</b></div>
       ${totalRecargado>0?`<div class="chip">Recargado: <b>${totalRecargado.toFixed(0)} L</b></div>`:''}
       ${totalDepositado>0?`<div class="chip">Depositado: <b>${totalDepositado.toFixed(0)} L</b></div>`:''}
-      <div class="chip">Movimientos: <b>${all.length}</b></div>
+      <div class="chip">Mostrando: <b>${all.length} de ${totalMovimientos}</b></div>
     </div>`:''  ;
 }
 
@@ -1358,6 +1373,19 @@ document.querySelectorAll('.pin-key').forEach(b=>b.disabled=true);
   }
   setLoginReady();
 })();
+// ── MENU ACCIONES ────────────────────────────────────────
+function toggleMenu(id){
+  // Cerrar todos los otros menús primero
+  document.querySelectorAll('[id^="menu-"]').forEach(m=>{if(m.id!==id)m.style.display='none';});
+  const m=document.getElementById(id);
+  if(m)m.style.display=m.style.display==='none'?'block':'none';
+}
+// Cerrar menús al hacer clic fuera
+document.addEventListener('click',e=>{
+  if(!e.target.closest('[id^="menu-"]')&&!e.target.closest('.btn'))
+    document.querySelectorAll('[id^="menu-"]').forEach(m=>m.style.display='none');
+});
+
 // ── EDITAR / ELIMINAR CARGAS ─────────────────────────────
 function abrirEditCarga(id, fuente){
   const carga = fuente==='Cisterna'
