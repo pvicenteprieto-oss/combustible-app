@@ -212,6 +212,10 @@ tr:last-child td{border-bottom:none}
           <div id="panel-cisternas"></div>
         </div>
         <div class="raised">
+          <div class="raised-title">Estación de servicio</div>
+          <div id="panel-estacion"></div>
+        </div>
+        <div class="raised">
           <div class="raised-title">Alertas de consumo</div>
           <div id="panel-desvios"></div>
         </div>
@@ -516,6 +520,30 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<div class="overlay" id="modal-deposito-estacion">
+  <div class="modal">
+    <div class="modal-title">Registrar depósito en estación <button class="modal-close" onclick="closeModal('modal-deposito-estacion')">✕</button></div>
+    <div class="hint-box">El sistema calcula los litros disponibles según el monto depositado y el precio del combustible.</div>
+    <div class="row2">
+      <div class="fg"><label>Monto depositado ($)</label><input id="dep-monto" type="number" min="1" step="0.01" placeholder="0.00" oninput="calcDepositoLitros()"/></div>
+      <div class="fg"><label>Precio por litro ($)</label><input id="dep-precio" type="number" min="0.01" step="0.01" placeholder="0.00" oninput="calcDepositoLitros()"/></div>
+    </div>
+    <div id="dep-litros-preview" style="padding:10px 12px;background:#f0faf0;border-radius:8px;border-left:3px solid #3B6D11;font-size:13px;color:#3B6D11;margin-bottom:12px;display:none">
+      Litros a acreditar: <b id="dep-litros-valor">0</b> L
+    </div>
+    <div class="row2">
+      <div class="fg"><label>Fecha</label><input id="dep-fecha" type="datetime-local"/></div>
+      <div class="fg"><label>N° comprobante (opcional)</label><input id="dep-comprobante" placeholder="Ej: TRF-0001234"/></div>
+    </div>
+    <div class="fg"><label>Observaciones</label><input id="dep-obs" placeholder="Opcional"/></div>
+    <div id="dep-alert"></div>
+    <div class="btn-row">
+      <button class="btn sec" onclick="closeModal('modal-deposito-estacion')">Cancelar</button>
+      <button class="btn suc" onclick="registrarDeposito()">Confirmar depósito ↗</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="modal-recarga-cisterna">
   <div class="modal">
     <div class="modal-title">Recargar cisterna <button class="modal-close" onclick="closeModal('modal-recarga-cisterna')">✕</button></div>
@@ -542,7 +570,7 @@ tr:last-child td{border-bottom:none}
 <script>
 const API='https://script.google.com/macros/s/AKfycbyxg1pw0DHIcLlItPWQgilTRBlp4ag9-8VM7wXaC2Ejam1Bhn5ZQRwGXXeCVzk7rVRb/exec';
 let currentUser=null,currentSection='panel',estTab='nueva',repEstTab='equipo';
-let S={config:{lowAlertPct:15,tolerance:25,minRecords:3,estacion:''},choferes:[],cisternas:[{id:'c1',nombre:'Cisterna 1',combustible:'Diesel común',capacidad:1500,current:0},{id:'c2',nombre:'Cisterna 2',combustible:'Diesel premium',capacidad:1500,current:0}],usuarios:[],equipos:[],cargas:[],recargas:[],ajustes:[],desvios:[],sesiones:[],cargas_estacion:[],contratos:[]};
+let S={config:{lowAlertPct:15,tolerance:25,minRecords:3,estacion:''},choferes:[],estacion_saldo:{litros:0},depositos:[],cisternas:[{id:'c1',nombre:'Cisterna 1',combustible:'Diesel común',capacidad:1500,current:0},{id:'c2',nombre:'Cisterna 2',combustible:'Diesel premium',capacidad:1500,current:0}],usuarios:[],equipos:[],cargas:[],recargas:[],ajustes:[],desvios:[],sesiones:[],cargas_estacion:[],contratos:[]};
 
 function getDeviceId(){let id=localStorage.getItem('dvc');if(!id){id='d'+Date.now().toString(36);localStorage.setItem('dvc',id);}return id;}
 function getDevice(){const ua=navigator.userAgent;if(/android/i.test(ua))return'Android';if(/iphone|ipad/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/mac/i.test(ua))return'Mac';return'Otro';}
@@ -630,6 +658,8 @@ async function loadAll(){
     S.cargas_estacion=data.cargas_estacion||[];
     S.contratos=data.contratos||[];
     S.choferes=data.choferes||[];
+    S.depositos=data.depositos||[];
+    if(data.estacion_saldo&&data.estacion_saldo.litros!==undefined)S.estacion_saldo=data.estacion_saldo;
     if(data.cisternas&&data.cisternas.length)S.cisternas=data.cisternas.map(c=>({...c,capacidad:+c.capacidad||1500,current:+c.current||0}));
     if(data.config&&data.config.lowAlertPct)S.config={...S.config,...data.config,lowAlertPct:+data.config.lowAlertPct||15,tolerance:+data.config.tolerance||25,minRecords:+data.config.minRecords||3};
     document.getElementById('loading-screen').style.display='none';document.getElementById('app-content').style.display='block';
@@ -683,6 +713,27 @@ function renderPanel(){
   document.getElementById('panel-cisternas').innerHTML=`
     <div class="tank-row">${S.cisternas.map(c=>{const pct=Math.round(c.current/c.capacidad*100);const cls=pct<alertPct?'danger':pct<alertPct*2?'warn':'';return`<div class="tank-wrap"><div class="tank"><div class="tfill ${c.id} ${cls}" style="height:${Math.max(2,pct)}%"><span class="tpct">${pct}%</span></div></div><div class="tank-label">${c.nombre}<br><small>${c.combustible}</small></div></div>`;}).join('')}</div>
     ${S.cisternas.map(c=>{const pct=Math.round(c.current/c.capacidad*100);return`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px"><span><b>${c.nombre}</b> — ${c.combustible}</span><div style="display:flex;gap:6px;align-items:center"><span class="badge ${pct<alertPct?'b-dan':pct<alertPct*2?'b-warn':'b-ok'}">${c.current.toFixed(0)} L / ${c.capacidad} L</span><button class="btn sec" style="padding:4px 10px;font-size:12px" onclick="openRecargaCisterna('${c.id}')">Recargar</button></div></div>`;}).join('')}`;
+
+  // Panel estación
+  const litEst=S.estacion_saldo?.litros||0;
+  const alertPctEst=S.config.lowAlertPct||15;
+  const maxLitEst=S.depositos.reduce((a,b)=>a+(+b.litros||0),0)||1;
+  const pctEst=Math.min(100,Math.round(litEst/Math.max(litEst,maxLitEst)*100));
+  const canDeposit=currentUser.rol==='empresa'||currentUser.rol==='admin';
+  document.getElementById('panel-estacion').innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:22px;font-weight:700">${litEst.toFixed(0)} L</div>
+        <span class="badge ${litEst<=0?'b-dan':litEst<200?'b-warn':'b-ok'}">${litEst<=0?'Sin saldo':litEst<200?'Saldo bajo':'Disponible'}</span>
+      </div>
+      ${canDeposit?`<button class="btn suc" style="padding:6px 14px;font-size:13px" onclick="openDeposito()">+ Registrar depósito</button>`:''}
+    </div>
+    <div class="prog-bar" style="height:8px;margin-bottom:8px">
+      <div class="prog-fill ${litEst<=0?'over':''}" style="width:${Math.max(0,pctEst)}%;background:${litEst<=0?'#A32D2D':litEst<200?'#BA7517':'#3B6D11'}"></div>
+    </div>
+    <div style="font-size:12px;color:#888">Litros disponibles para cargar en ${S.config.estacion||'la estación de servicio'}</div>
+    ${S.depositos.length?`<div style="margin-top:10px;font-size:12px;color:#888">Último depósito: ${S.depositos.slice(-1)[0].litros?.toFixed(0)||'-'} L — ${fdt(S.depositos.slice(-1)[0].fecha)}</div>`:''}
+  `;
 
   const al=[];
   S.cisternas.forEach(c=>{const pct=c.current/c.capacidad*100;if(pct<alertPct)al.push(`<div class="alert al-d">${c.nombre} (${c.combustible}): nivel crítico — ${c.current.toFixed(0)} L.</div>`);else if(pct<alertPct*2)al.push(`<div class="alert al-w">${c.nombre}: nivel bajo — ${c.current.toFixed(0)} L.</div>`);});
@@ -859,6 +910,10 @@ async function registrarCargaEstacion(){
   try{
     await api({action:'addCargaEstacion',data:JSON.stringify(reg)});
     S.cargas_estacion.push(reg);
+    // Descontar del saldo estación
+    const newSaldoEst=Math.max(0,parseFloat(((S.estacion_saldo?.litros||0)-liters).toFixed(2)));
+    await api({action:'updateEstacionSaldo',value:newSaldoEst});
+    S.estacion_saldo={litros:newSaldoEst};
     setAlert('en-alert','Carga en estación registrada correctamente.','o');
     ['en-liters','en-receipt','en-price','en-obs'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('en-driver-sel').value='';
@@ -912,6 +967,46 @@ function renderRepEst(){
   document.getElementById('rep-est-content').innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1rem"><div class="chip">Total: <b>${totalGen.toFixed(0)} L</b></div><div class="chip">Cisterna: <b>${all.filter(l=>l.fuente==='Cisterna').reduce((a,b)=>a+b.liters,0).toFixed(0)} L</b></div><div class="chip">Estación: <b>${all.filter(l=>l.fuente==='Estación').reduce((a,b)=>a+b.liters,0).toFixed(0)} L</b></div><div class="chip">Ops: <b>${all.length}</b></div></div>${html}`;
 }
 
+// ── ESTACIÓN SALDO ───────────────────────────────────────
+function calcDepositoLitros(){
+  const monto=+document.getElementById('dep-monto').value||0;
+  const precio=+document.getElementById('dep-precio').value||0;
+  const prev=document.getElementById('dep-litros-preview');
+  const val=document.getElementById('dep-litros-valor');
+  if(monto>0&&precio>0){
+    const litros=monto/precio;
+    val.textContent=litros.toFixed(1);
+    prev.style.display='block';
+  } else {
+    prev.style.display='none';
+  }
+}
+function openDeposito(){
+  if(!document.getElementById('dep-fecha').value)document.getElementById('dep-fecha').value=now();
+  showModal('modal-deposito-estacion');
+}
+async function registrarDeposito(){
+  const monto=+document.getElementById('dep-monto').value;
+  const precio=+document.getElementById('dep-precio').value;
+  const fecha=document.getElementById('dep-fecha').value||now();
+  const comprobante=document.getElementById('dep-comprobante').value.trim();
+  const obs=document.getElementById('dep-obs').value.trim();
+  if(!monto||monto<=0||!precio||precio<=0){setAlert('dep-alert','Ingresá el monto y el precio por litro.','w');return;}
+  const litros=monto/precio;
+  const dep={id:uid(),monto,precio,litros:parseFloat(litros.toFixed(2)),fecha,comprobante,obs,usuario:currentUser.nombre||currentUser.username};
+  const newSaldo={litros:parseFloat(((S.estacion_saldo?.litros||0)+litros).toFixed(2))};
+  try{
+    await api({action:'addDeposito',data:JSON.stringify(dep)});
+    await api({action:'updateEstacionSaldo',value:newSaldo.litros});
+    S.depositos.push(dep);
+    S.estacion_saldo=newSaldo;
+    closeModal('modal-deposito-estacion');
+    ['dep-monto','dep-precio','dep-comprobante','dep-obs'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('dep-litros-preview').style.display='none';
+    renderPanel();
+  }catch(e){setAlert('dep-alert','Error: '+e.message,'d');}
+}
+
 // ── CISTERNAS ────────────────────────────────────────────
 function openRecargaCisterna(id){
   const selRC=document.getElementById('rc-cisterna');selRC.innerHTML=S.cisternas.map(c=>`<option value="${c.id}" ${c.id===id?'selected':''}>${c.nombre} — ${c.combustible}</option>`).join('');
@@ -923,8 +1018,16 @@ async function recargarCisterna(){
   if(!liters||liters<=0){setAlert('rc-alert','Ingresá los litros.','w');return;}
   const c=S.cisternas.find(x=>x.id===cId),prev=c.current,nl=Math.min(c.capacidad,prev+liters);
   const rec={id:uid(),cisternaId:cId,cisternaName:c.nombre,liters,price,total:price*liters,station,receipt,resp,date,levelBefore:prev,levelAfter:nl};
-  try{await api({action:'addRecarga',data:JSON.stringify(rec)});await api({action:'updateCisterna',id:cId,value:nl});S.recargas.push(rec);c.current=nl;closeModal('modal-recarga-cisterna');renderPanel();}
-  catch(e){setAlert('rc-alert','Error: '+e.message,'d');}
+  try{
+    await api({action:'addRecarga',data:JSON.stringify(rec)});
+    await api({action:'updateCisterna',id:cId,value:nl});
+    S.recargas.push(rec);c.current=nl;
+    // Descontar del saldo estación
+    const newSaldoCist=Math.max(0,parseFloat(((S.estacion_saldo?.litros||0)-liters).toFixed(2)));
+    await api({action:'updateEstacionSaldo',value:newSaldoCist});
+    S.estacion_saldo={litros:newSaldoCist};
+    closeModal('modal-recarga-cisterna');renderPanel();
+  }catch(e){setAlert('rc-alert','Error: '+e.message,'d');}
 }
 
 // ── EQUIPOS ──────────────────────────────────────────────
@@ -1048,6 +1151,8 @@ setInterval(async()=>{
     S.cargas_estacion=data.cargas_estacion||[];
     S.contratos=data.contratos||[];
     S.choferes=data.choferes||[];
+    S.depositos=data.depositos||[];
+    if(data.estacion_saldo&&data.estacion_saldo.litros!==undefined)S.estacion_saldo=data.estacion_saldo;
     if(data.cisternas&&data.cisternas.length)S.cisternas=data.cisternas.map(c=>({...c,capacidad:+c.capacidad||1500,current:+c.current||0}));
     if(data.config&&data.config.lowAlertPct)S.config={...S.config,...data.config,lowAlertPct:+data.config.lowAlertPct||15,tolerance:+data.config.tolerance||25,minRecords:+data.config.minRecords||3};
     // Solo rerenderizar si NO estamos en carga o estacion (para no pisar lo que el usuario está completando)
