@@ -286,6 +286,8 @@ tr:last-child td{border-bottom:none}
                 <option value="Cisterna">Cisterna</option>
                 <option value="Estación">Estación</option>
               </select></div>
+            <div class="fg" style="flex:1;min-width:130px;margin:0"><label>Cisterna</label>
+              <select id="hf-cisterna"><option value="">Todas</option></select></div>
             <button class="btn sec" onclick="renderCargas()">Filtrar</button>
           </div>
           <div id="cargas-table"></div>
@@ -944,6 +946,12 @@ function renderCargas(){
     selCont.innerHTML='<option value="">Todos</option>'+S.contratos.map(c=>`<option value="${c.id}" ${c.id===cv?'selected':''}>${c.nombre}</option>`).join('');
     selCont.value=cv;
   }
+  const selCist=document.getElementById('hf-cisterna');
+  if(selCist){
+    const cv=selCist.value;
+    selCist.innerHTML='<option value="">Todas</option>'+S.cisternas.map(c=>`<option value="${c.id}" ${c.id===cv?'selected':''}>${c.nombre} — ${c.combustible}</option>`).join('');
+    selCist.value=cv;
+  }
 
   // Combinar cargas cisterna + estación
   const fuente=document.getElementById('hf-fuente')?.value||'';
@@ -959,6 +967,7 @@ function renderCargas(){
       equipoId:l.equipoId, chofer:l.driver, litros:+l.liters||0,
       combustible:S.cisternas.find(c=>c.id===l.cisternaId)?.combustible||'-',
       contrato:l.contratoNombre||'', contratoId:l.contratoId||'',
+      cisternaId:l.cisternaId||'',
       tacometro:l.tacometer||'', km:l.km||'', obs:l.obs||'', fuente:'Cisterna'
     })),
     ...S.cargas_estacion.map(l=>({
@@ -971,7 +980,9 @@ function renderCargas(){
   ];
 
   // Aplicar filtros
+  const cisternaId2=document.getElementById('hf-cisterna')?.value||'';
   if(fuente) all=all.filter(l=>l.fuente===fuente);
+  if(cisternaId2) all=all.filter(l=>l.cisternaId===cisternaId2);
   if(chofer) all=all.filter(l=>l.chofer===chofer);
   if(equipoId) all=all.filter(l=>l.equipoId===equipoId);
   if(contratoId) all=all.filter(l=>l.contratoId===contratoId);
