@@ -906,7 +906,7 @@ async function registrarCargaCisterna(){
   let horasJornada=0;if(jstart){const ld=new Date(date);const[hh,mm]=jstart.split(':').map(Number);const st=new Date(ld);st.setHours(hh,mm,0);horasJornada=Math.max(0,(ld-st)/3600000);}
   const newLevel=Math.max(0,cisterna.current-liters);
   const contrato=S.contratos.find(c=>c.id===contratoId);
-  const load={id:uid(),cisternaId,equipoId:eqId,plate:eq.plate,tipoEquipo:eq.tipo,driver,liters,tacometer:taco||'',km:km||'',horasJornada:parseFloat(horasJornada.toFixed(2)),date,obs,contratoId:contratoId||'',contratoNombre:contrato?contrato.nombre:'',cisternaBefore:cisterna.current,cisternaAfter:newLevel};
+  const load={id:uid(),cisternaId,equipoId:eqId,plate:eq.plate,tipoEquipo:eq.tipo,driver,liters,tacometer:taco||'',km:km||'',horasJornada:parseFloat(horasJornada.toFixed(2)),date,obs,contratoId:contratoId||'',contratoNombre:contrato?contrato.nombre:'',cisternaBefore:cisterna.current,cisternaAfter:newLevel,registradoPor:currentUser.nombre||currentUser.username};
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Guardando...';
   try{
     await api({action:'addCarga',data:JSON.stringify(load)});await api({action:'updateCisterna',id:cisternaId,value:newLevel});
@@ -968,14 +968,16 @@ function renderCargas(){
       combustible:S.cisternas.find(c=>c.id===l.cisternaId)?.combustible||'-',
       contrato:l.contratoNombre||'', contratoId:l.contratoId||'',
       cisternaId:l.cisternaId||'',
-      tacometro:l.tacometer||'', km:l.km||'', obs:l.obs||'', fuente:'Cisterna'
+      tacometro:l.tacometer||'', km:l.km||'', obs:l.obs||'', fuente:'Cisterna',
+      registradoPor:l.registradoPor||''
     })),
     ...S.cargas_estacion.map(l=>({
       id:l.id, fecha:l.date, equipo:l.plate||S.equipos.find(e=>e.id===l.equipoId)?.plate||'-',
       equipoId:l.equipoId, chofer:l.driver, litros:+l.liters||0,
       combustible:FLABEL(l.combustible)||'-',
       contrato:l.contratoNombre||'', contratoId:l.contratoId||'',
-      tacometro:'', km:'', obs:l.obs||'', fuente:'Estación', remito:l.receipt||''
+      tacometro:'', km:'', obs:l.obs||'', fuente:'Estación', remito:l.receipt||'',
+      registradoPor:l.registradoPor||''
     }))
   ];
 
@@ -1003,7 +1005,7 @@ function renderCargas(){
       <thead><tr>
         <th>Fecha</th><th>Equipo</th><th>Chofer</th><th>Litros</th>
         <th>Combustible</th><th>Fuente</th><th>Contrato</th>
-        <th>Tacóm.</th><th>Km</th><th>Obs</th>
+        <th>Tacóm.</th><th>Km</th><th>Registrado por</th><th>Obs</th>
       </tr></thead>
       <tbody>${all.map(l=>`<tr>
         <td style="white-space:nowrap">${fdt(l.fecha)}</td>
@@ -1015,6 +1017,7 @@ function renderCargas(){
         <td>${l.contrato||'-'}</td>
         <td>${l.tacometro||'-'}</td>
         <td>${l.km||'-'}</td>
+        <td>${l.registradoPor||'-'}</td>
         <td style="color:#aaa;font-size:12px">${l.obs||'-'}</td>
       </tr>`).join('')}
       </tbody>
@@ -1052,7 +1055,7 @@ async function registrarCargaEstacion(){
   if(!eqId||!driver||!liters||liters<=0){setAlert('en-alert','Completá equipo, operador y litros.','w');return;}
   const eq=S.equipos.find(e=>e.id===eqId);
   const contrato=S.contratos.find(c=>c.id===contratoId);
-  const reg={id:uid(),equipoId:eqId,plate:eq.plate,tipoEquipo:eq.tipo,driver,liters,combustible:fuel,contratoId:contratoId||'',contratoNombre:contrato?contrato.nombre:'',receipt,price,total:price*liters,date,obs};
+  const reg={id:uid(),equipoId:eqId,plate:eq.plate,tipoEquipo:eq.tipo,driver,liters,combustible:fuel,contratoId:contratoId||'',contratoNombre:contrato?contrato.nombre:'',receipt,price,total:price*liters,date,obs,registradoPor:currentUser.nombre||currentUser.username};
   try{
     await api({action:'addCargaEstacion',data:JSON.stringify(reg)});
     S.cargas_estacion.push(reg);
