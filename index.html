@@ -679,7 +679,12 @@ async function registrarSesion(){
 }
 
 // ── HELPERS ──────────────────────────────────────────────
-function now(){return new Date().toISOString().slice(0,16)}
+function now(){
+  const d=new Date();
+  // Usar hora local del dispositivo (Argentina UTC-3)
+  const pad=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 function todayStr(){return new Date().toDateString()}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5)}
 function fdt(s){if(!s)return'-';try{const d=new Date(String(s).includes('T')?s:s+'T00:00');return d.toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return s}}
