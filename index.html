@@ -917,8 +917,8 @@ function renderPanel(){
 
   const alertPct=S.config.lowAlertPct||15;
   document.getElementById('panel-cisternas').innerHTML=`
-    <div class="tank-row">${S.cisternas.map(c=>{const pct=Math.round(c.current/c.capacidad*100);const cls=pct<alertPct?'danger':pct<alertPct*2?'warn':'';return`<div class="tank-wrap"><div class="tank"><div class="tfill ${c.id} ${cls}" style="height:${Math.max(2,pct)}%"><span class="tpct">${pct}%</span></div></div><div class="tank-label">${c.nombre}<br><small>${c.combustible}</small></div></div>`;}).join('')}</div>
-    ${S.cisternas.map(c=>{const pct=Math.round(c.current/c.capacidad*100);return`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px"><span><b>${c.nombre}</b> — ${c.combustible}</span><div style="display:flex;gap:6px;align-items:center"><span class="badge ${pct<alertPct?'b-dan':pct<alertPct*2?'b-warn':'b-ok'}">${c.current.toFixed(0)} L / ${c.capacidad} L</span><button class="btn sec" style="padding:4px 10px;font-size:12px" onclick="openRecargaCisterna('${c.id}')">Recargar</button></div></div>`;}).join('')}`;
+    <div class="tank-row">${S.cisternas.map(c=>{const pct=c.current<0?0:Math.round(c.current/c.capacidad*100);const cls=c.current<0?'danger':pct<alertPct?'danger':pct<alertPct*2?'warn':'';return`<div class="tank-wrap"><div class="tank"><div class="tfill ${c.id} ${cls}" style="height:${Math.max(2,pct)}%"><span class="tpct">${pct}%</span></div></div><div class="tank-label">${c.nombre}<br><small>${c.combustible}</small></div></div>`;}).join('')}</div>
+    ${S.cisternas.map(c=>{const pct=Math.round(c.current/c.capacidad*100);return`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px"><span><b>${c.nombre}</b> — ${c.combustible}</span><div style="display:flex;gap:6px;align-items:center"><span class="badge ${c.current<0?'b-dan':pct<alertPct?'b-dan':pct<alertPct*2?'b-warn':'b-ok'}">${c.current.toFixed(0)} L / ${c.capacidad} L</span><button class="btn sec" style="padding:4px 10px;font-size:12px" onclick="openRecargaCisterna('${c.id}')">Recargar</button></div></div>`;}).join('')}`;
 
   // Panel estación
   const litEst=S.estacion_saldo?.litros||0;
@@ -940,6 +940,10 @@ function renderPanel(){
     <div style="font-size:12px;color:#888">Litros disponibles para cargar en ${S.config.estacion||'la estación de servicio'}</div>
     ${S.depositos.length?`<div style="margin-top:10px;font-size:12px;color:#888">Último depósito: ${S.depositos.slice(-1)[0].litros?.toFixed(0)||'-'} L — ${fdt(S.depositos.slice(-1)[0].fecha)}</div>`:''}
   `;
+
+  // Alertas de saldo negativo con botón salvar diferencia
+  const alertasNeg=S.cisternas.filter(c=>c.current<0).map(c=>`<div class="alert al-d" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><span><b>${c.nombre}</b>: saldo negativo — ${c.current.toFixed(0)} L (diferencia de ${Math.abs(c.current).toFixed(0)} L entre cargas registradas y stock cargado)</span><button class="btn dan" style="padding:5px 12px;font-size:12px;white-space:nowrap" onclick="salvarDiferencia('${c.id}')">Salvar diferencia ↗</button></div>`);
+  document.getElementById('panel-alerts').innerHTML=alertasNeg.join('');
 
   const al=[];
   S.cisternas.forEach(c=>{const pct=c.current/c.capacidad*100;if(pct<alertPct)al.push(`<div class="alert al-d">${c.nombre} (${c.combustible}): nivel crítico — ${c.current.toFixed(0)} L.</div>`);else if(pct<alertPct*2)al.push(`<div class="alert al-w">${c.nombre}: nivel bajo — ${c.current.toFixed(0)} L.</div>`);});
@@ -1065,12 +1069,15 @@ async function registrarCargaCisterna(){
   if(!eqId||!driver||!liters||liters<=0){setAlert('carga-alert','Completá equipo, operador y litros.','w');return;}
   if(!checkMedicion()){setAlert('carga-alert','Completá al menos tacómetro o kilómetros.','d');return;}
   const cisterna=S.cisternas.find(c=>c.id===cisternaId);
-  if(liters>cisterna.current){setAlert('carga-alert',`Sin stock en ${cisterna.nombre} (${cisterna.current.toFixed(0)} L).`,'d');return;}
+  if(liters>cisterna.current){
+    const diff=(liters-cisterna.current).toFixed(0);
+    if(!confirm(`La cisterna ${cisterna.nombre} tiene ${cisterna.current.toFixed(0)} L disponibles.\nEstás registrando ${liters} L — la cisterna quedará en -${diff} L.\n\n¿Confirmás la carga?`))return;
+  }
   const eq=S.equipos.find(e=>e.id===eqId);
   const used=S.cargas.filter(l=>l.equipoId===eqId&&new Date(l.date).toDateString()===todayStr()).reduce((a,b)=>a+b.liters,0);
   if(used+liters>eq.quota*1.2){setAlert('carga-alert','Supera el 120% de la cuota diaria. Requiere autorización.','d');return;}
   let horasJornada=0;if(jstart){const ld=new Date(date);const[hh,mm]=jstart.split(':').map(Number);const st=new Date(ld);st.setHours(hh,mm,0);horasJornada=Math.max(0,(ld-st)/3600000);}
-  const newLevel=Math.max(0,cisterna.current-liters);
+  const newLevel=parseFloat((cisterna.current-liters).toFixed(2));
   const contrato=S.contratos.find(c=>c.id===contratoId);
   const load={id:uid(),cisternaId,equipoId:eqId,plate:eq.plate,tipoEquipo:eq.tipo,driver,liters,tacometer:taco||'',km:km||'',horasJornada:parseFloat(horasJornada.toFixed(2)),date,obs,contratoId:contratoId||'',contratoNombre:contrato?contrato.nombre:'',cisternaBefore:cisterna.current,cisternaAfter:newLevel,registradoPor:currentUser.nombre||currentUser.username};
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Guardando...';
@@ -1324,6 +1331,32 @@ function renderRepEst(){
   }
   const totalGen=all.reduce((a,b)=>a+b.liters,0);
   document.getElementById('rep-est-content').innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1rem"><div class="chip">Total: <b>${totalGen.toFixed(0)} L</b></div><div class="chip">Cisterna: <b>${all.filter(l=>l.fuente==='Cisterna').reduce((a,b)=>a+b.liters,0).toFixed(0)} L</b></div><div class="chip">Estación: <b>${all.filter(l=>l.fuente==='Estación').reduce((a,b)=>a+b.liters,0).toFixed(0)} L</b></div><div class="chip">Ops: <b>${all.length}</b></div></div>${html}`;
+}
+
+// ── SALVAR DIFERENCIA ───────────────────────────────────
+async function salvarDiferencia(cisternaId){
+  const c=S.cisternas.find(x=>x.id===cisternaId);
+  if(!c)return;
+  const diff=Math.abs(c.current).toFixed(0);
+  if(!confirm(`Esto pondrá la ${c.nombre} en 0 L y registrará una diferencia de ${diff} L en el historial.\n\n¿Confirmás?`))return;
+  const ajuste={
+    id:uid(), fecha:now(), cisternaId, cisternaName:c.nombre,
+    litrosAntes:c.current, litrosDespues:0, diferencia:+diff,
+    motivo:`Diferencia de calibración — ${diff} L salvados a 0`,
+    usuario:currentUser.nombre||currentUser.username, tipo:'salvar_diferencia'
+  };
+  try{
+    await api({action:'addAjuste',data:JSON.stringify(ajuste)});
+    await api({action:'updateCisterna',id:cisternaId,value:0});
+    S.ajustes.push(ajuste);
+    c.current=0;
+    // También registrar en auditoría
+    const audit={id:uid(),fecha:now(),tipo:'ajuste',fuente:'Cisterna',cargaId:ajuste.id,usuario:currentUser.nombre||currentUser.username,motivo:ajuste.motivo,litrosAntes:ajuste.litrosAntes,litrosDespues:0,cambios:`Diferencia salvada en ${c.nombre}: ${diff} L`};
+    await api({action:'addAuditoria',data:JSON.stringify(audit)});
+    S.auditoria.push(audit);
+    renderPanel();
+    alert(`Diferencia salvada. ${c.nombre} queda en 0 L. Se registraron ${diff} L de diferencia en el historial.`);
+  }catch(e){alert('Error: '+e.message);}
 }
 
 // ── ESTACIÓN SALDO ───────────────────────────────────────
