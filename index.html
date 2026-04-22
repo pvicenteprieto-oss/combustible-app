@@ -943,11 +943,9 @@ function renderPanel(){
 
   // Alertas de saldo negativo con botón salvar diferencia
   const alertasNeg=S.cisternas.filter(c=>c.current<0).map(c=>`<div class="alert al-d" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><span><b>${c.nombre}</b>: saldo negativo — ${c.current.toFixed(0)} L (diferencia de ${Math.abs(c.current).toFixed(0)} L entre cargas registradas y stock cargado)</span><button class="btn dan" style="padding:5px 12px;font-size:12px;white-space:nowrap" onclick="salvarDiferencia('${c.id}')">Salvar diferencia ↗</button></div>`);
-  document.getElementById('panel-alerts').innerHTML=alertasNeg.join('');
-
   const al=[];
   S.cisternas.forEach(c=>{const pct=c.current/c.capacidad*100;if(pct<alertPct)al.push(`<div class="alert al-d">${c.nombre} (${c.combustible}): nivel crítico — ${c.current.toFixed(0)} L.</div>`);else if(pct<alertPct*2)al.push(`<div class="alert al-w">${c.nombre}: nivel bajo — ${c.current.toFixed(0)} L.</div>`);});
-  document.getElementById('panel-alerts').innerHTML=al.join('');
+  document.getElementById('panel-alerts').innerHTML=[...alertasNeg,...al].join('');
 
   const dd=S.desvios.filter(d=>(new Date()-new Date(d.date))<86400000*7).slice(-4).reverse();
   document.getElementById('panel-desvios').innerHTML=dd.length?dd.map(d=>`<div class="dev-card ${d.tipo==='alto'?'dev-dan':'dev-warn'}"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><span style="font-weight:700;font-size:13px">${d.plate} — ${d.driver}</span><span class="badge ${d.tipo==='alto'?'b-dan':'b-warn'}">${d.tipo==='alto'?'Consumo alto':'Consumo bajo'} ${d.desvPct>0?'+':''}${(+d.desvPct).toFixed(0)}%</span></div><div style="font-size:12px;color:#888;margin-top:2px">${(+d.actual).toFixed(1)} L/h vs ${(+d.esperado).toFixed(1)} esperado — ${fdt(d.date)}</div></div>`).join(''):`<div class="msg">Sin alertas recientes.</div>`;
