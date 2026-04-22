@@ -689,6 +689,13 @@ tr:last-child td{border-bottom:none}
 </div>
 
 <script>
+// Desregistrar service workers viejos y limpiar caché al cargar
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(regs=>{
+    regs.forEach(r=>r.unregister());
+  });
+  caches.keys().then(keys=>keys.forEach(k=>caches.delete(k)));
+}
 const API='https://script.google.com/macros/s/AKfycbyxg1pw0DHIcLlItPWQgilTRBlp4ag9-8VM7wXaC2Ejam1Bhn5ZQRwGXXeCVzk7rVRb/exec';
 let currentUser=null,currentSection='panel',estTab='nueva',repEstTab='equipo',_saving=false;
 let S={config:{lowAlertPct:15,tolerance:25,minRecords:3,estacion:''},choferes:[],estacion_saldo:{litros:0},depositos:[],auditoria:[],cisternas:[{id:'c1',nombre:'Cisterna 1',combustible:'Diesel común',capacidad:1500,current:0},{id:'c2',nombre:'Cisterna 2',combustible:'Diesel premium',capacidad:1500,current:0}],usuarios:[],equipos:[],cargas:[],recargas:[],ajustes:[],desvios:[],sesiones:[],cargas_estacion:[],contratos:[]};
@@ -2049,4 +2056,3 @@ setInterval(async()=>{
 </script>
 </body>
 </html>
- 
