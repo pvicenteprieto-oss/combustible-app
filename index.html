@@ -1056,6 +1056,17 @@ async function registrarCargaCisterna(){
 }
 
 // ── CARGAS (historial completo) ──────────────────────────
+function renderAcciones(id, fuente){
+  if(!fuente) return '—';
+  var mid="menu-"+id;
+  var btn='<button class="btn sec" style="padding:4px 10px;font-size:16px;line-height:1" onclick="toggleMenu(&quot;'+mid+'&quot;)">⋮</button>';
+  var editar='<button onclick="abrirEditMovimiento(&quot;'+id+'&quot;,&quot;'+fuente+'&quot;);toggleMenu(&quot;'+mid+'&quot;)" style="display:block;width:100%;padding:10px 16px;text-align:left;border:none;background:#fff;cursor:pointer;font-size:13px;color:#1a1a1a">Editar</button>';
+  var elim='<button onclick="eliminarMovimiento(&quot;'+id+'&quot;,&quot;'+fuente+'&quot;);toggleMenu(&quot;'+mid+'&quot;)" style="display:block;width:100%;padding:10px 16px;text-align:left;border:none;background:#fff;cursor:pointer;font-size:13px;color:#A32D2D;border-top:1px solid #f0f0f0">Eliminar</button>';
+  var menu='<div id="'+mid+'" style="display:none;position:absolute;right:0;top:100%;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:50;min-width:130px;overflow:hidden">'+editar+elim+'</div>';
+  return '<div style="position:relative;display:inline-block">'+btn+menu+'</div>';
+}
+
+
 function renderCargas(){
   // Poblar filtros
   const selCh=document.getElementById('hf-chofer');
@@ -1177,15 +1188,7 @@ function renderCargas(){
         <td>${l.km||'-'}</td>
         <td>${l.registradoPor||'-'}</td>
         <td style="color:#aaa;font-size:12px">${l.detalle||l.obs||'-'}</td>
-        <td>${(l.fuente&&l.fuente!=='')?`
-          <div style="position:relative;display:inline-block">
-            <button class="btn sec" style="padding:4px 10px;font-size:16px;line-height:1" onclick="toggleMenu('menu-${l.id}')">⋮</button>
-            <div id="menu-${l.id}" style="display:none;position:absolute;right:0;top:100%;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:50;min-width:130px;overflow:hidden">
-              <button onclick="abrirEditMovimiento('${l.id}','${l.fuente}');toggleMenu('menu-${l.id}')" style="display:block;width:100%;padding:10px 16px;text-align:left;border:none;background:#fff;cursor:pointer;font-size:13px;color:#1a1a1a">Editar</button>
-              <button onclick="eliminarMovimiento('${l.id}','${l.fuente}');toggleMenu('menu-${l.id}')" style="display:block;width:100%;padding:10px 16px;text-align:left;border:none;background:#fff;cursor:pointer;font-size:13px;color:#A32D2D;border-top:1px solid #f0f0f0">Eliminar</button>
-            </div>
-          </div>
-        `:'—'}</td>
+        <td>${renderAcciones(l.id,l.fuente)}</td>
       </tr>`).join('')}
       </tbody>
     </table></div>`:`<div class="msg">Sin cargas para los filtros aplicados.</div>`;
