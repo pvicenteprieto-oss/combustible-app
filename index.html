@@ -403,6 +403,29 @@ tr:last-child td{border-bottom:none}
         </div>
       </div>
 
+      <!-- ANÁLISIS -->
+      <div id="sec-analisis" class="section">
+        <div id="analisis-insights"></div>
+        <div class="panel-grid">
+          <div class="raised">
+            <div class="raised-title">Proyecciones</div>
+            <div id="analisis-proyecciones"></div>
+          </div>
+          <div class="raised">
+            <div class="raised-title">Patrones de tiempo</div>
+            <div id="analisis-patrones"></div>
+          </div>
+          <div class="raised">
+            <div class="raised-title">Ranking de consumo por equipo</div>
+            <div id="analisis-equipos"></div>
+          </div>
+          <div class="raised">
+            <div class="raised-title">Ranking de consumo por chofer</div>
+            <div id="analisis-choferes"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- CONTRATOS -->
       <div id="sec-contratos" class="section">
         <div class="raised">
@@ -698,6 +721,7 @@ const NAV_ITEMS=[
   {id:'cargas',   label:'Cargas',    icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01', roles:['encargado','empresa','admin']},
   {id:'equipos',  label:'Equipos',   icon:'M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l3-3h7z M19 16l3-3V8a1 1 0 00-1-1h-5a1 1 0 00-1 1v8h4z', roles:['empresa','admin']},
   {id:'contratos',label:'Contratos', icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', roles:['empresa','admin']},
+  {id:'analisis', label:'Análisis',  icon:'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', roles:['empresa','admin']},
   {id:'choferes', label:'Choferes',  icon:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', roles:['admin','empresa']},
   {id:'usuarios', label:'Usuarios',  icon:'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', roles:['admin']},
   {id:'sesiones', label:'Sesiones',  icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', roles:['admin']},
@@ -720,7 +744,7 @@ function show(id){
   document.querySelectorAll('.snav-item,.bnav-item').forEach(b=>b.classList.toggle('active',b.id===`snav-${id}`||b.id===`bnav-${id}`));
   currentSection=id;renderSection(id);
 }
-function renderSection(id){switch(id){case 'panel':renderPanel();break;case 'carga':renderFormCarga();break;case 'estacion':renderEstacion();break;case 'cargas':renderCargas();break;case 'equipos':renderEquipos();break;case 'contratos':renderContratos();break;case 'choferes':renderChoferes();break;case 'usuarios':renderUsuarios();break;case 'sesiones':renderSesiones();break;case 'config':renderConfig();break;}}
+function renderSection(id){switch(id){case 'panel':renderPanel();break;case 'carga':renderFormCarga();break;case 'estacion':renderEstacion();break;case 'cargas':renderCargas();break;case 'equipos':renderEquipos();break;case 'contratos':renderContratos();break;case 'analisis':renderAnalisis();break;case 'choferes':renderChoferes();break;case 'usuarios':renderUsuarios();break;case 'sesiones':renderSesiones();break;case 'config':renderConfig();break;}}
 function showModal(id){document.getElementById(id).classList.add('open')}
 function closeModal(id){document.getElementById(id).classList.remove('open')}
 function setAlert(id,msg,type='o'){const el=document.getElementById(id);if(el)el.innerHTML=msg?`<div class="alert al-${type}">${msg}</div>`:'';}
@@ -1585,6 +1609,213 @@ async function eliminarCarga(id, fuente){
     S.auditoria.push(audit);
     renderCargas();renderPanel();
   }catch(e){alert('Error: '+e.message);}
+}
+
+// ── ANÁLISIS E INTELIGENCIA ──────────────────────────────
+function renderAnalisis(){
+  const DIAS=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const MIN_DIAS=7;
+
+  // Combinar todas las cargas
+  const todasCargas=[
+    ...S.cargas.map(l=>({...l,liters:+l.liters||0,fecha:new Date(l.date),fuente:'Cisterna'})),
+    ...S.cargas_estacion.map(l=>({...l,liters:+l.liters||0,fecha:new Date(l.date),fuente:'Estación'}))
+  ].filter(l=>!isNaN(l.fecha));
+
+  if(todasCargas.length===0){
+    ['analisis-insights','analisis-proyecciones','analisis-patrones','analisis-equipos','analisis-choferes']
+      .forEach(id=>document.getElementById(id).innerHTML='<div class="msg">Sin datos suficientes aún.</div>');
+    return;
+  }
+
+  const ahora=new Date();
+  const hace30=new Date(ahora-30*86400000);
+  const recientes=todasCargas.filter(l=>l.fecha>=hace30);
+  const diasConDatos=[...new Set(todasCargas.map(l=>l.fecha.toDateString()))].length;
+  const pocosDatos=diasConDatos<MIN_DIAS;
+
+  // ── PROYECCIONES ─────────────────────────────────────
+  let proyHtml='';
+  if(pocosDatos){
+    proyHtml=`<div class="hint-box">Se necesitan al menos ${MIN_DIAS} días de registros para calcular proyecciones. Llevás ${diasConDatos} día(s).</div>`;
+  } else {
+    // Consumo diario promedio por cisterna (últimos 30 días)
+    proyHtml=S.cisternas.map(c=>{
+      const cargasCist=recientes.filter(l=>l.cisternaId===c.id);
+      if(!cargasCist.length)return`<div style="margin-bottom:12px"><b>${c.nombre}</b><div style="font-size:13px;color:#888">Sin cargas en los últimos 30 días.</div></div>`;
+      const diasRango=Math.max(1,(ahora-hace30)/86400000);
+      const totalL=cargasCist.reduce((a,b)=>a+b.liters,0);
+      const lDia=totalL/diasRango;
+      const diasRestantes=lDia>0?Math.floor(c.current/lDia):null;
+      const fechaEstimada=diasRestantes!==null?new Date(ahora.getTime()+diasRestantes*86400000):null;
+      const pct=Math.round(c.current/c.capacidad*100);
+      const cls=diasRestantes!==null&&diasRestantes<7?'b-dan':diasRestantes!==null&&diasRestantes<14?'b-warn':'b-ok';
+      return`<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0f0f0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <b>${c.nombre}</b>
+          <span class="badge ${cls}">${diasRestantes!==null?diasRestantes+' días':'Sin datos'}</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill ${pct<15?'over':''}" style="width:${pct}%"></div></div>
+        <div style="font-size:12px;color:#888;margin-top:5px">
+          ${c.current.toFixed(0)} L disponibles — ${lDia.toFixed(1)} L/día promedio
+          ${fechaEstimada?`<br>Se vacía aprox. el <b>${fechaEstimada.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'})}</b>`:''}
+        </div>
+      </div>`;
+    }).join('');
+
+    // Proyección saldo estación
+    const cargasEst=recientes.filter(l=>l.fuente==='Estación');
+    if(cargasEst.length>0){
+      const diasRango=Math.max(1,(ahora-hace30)/86400000);
+      const totalEst=cargasEst.reduce((a,b)=>a+b.liters,0);
+      const lDiaEst=totalEst/diasRango;
+      const diasRestEst=lDiaEst>0?Math.floor((S.estacion_saldo?.litros||0)/lDiaEst):null;
+      const fechaEstEst=diasRestEst!==null?new Date(ahora.getTime()+diasRestEst*86400000):null;
+      const clsEst=diasRestEst!==null&&diasRestEst<7?'b-dan':diasRestEst!==null&&diasRestEst<14?'b-warn':'b-ok';
+      proyHtml+=`<div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <b>Saldo estación</b>
+          <span class="badge ${clsEst}">${diasRestEst!==null?diasRestEst+' días':'Sin datos'}</span>
+        </div>
+        <div style="font-size:12px;color:#888">
+          ${(S.estacion_saldo?.litros||0).toFixed(0)} L disponibles — ${lDiaEst.toFixed(1)} L/día promedio
+          ${fechaEstEst?`<br>Se agota aprox. el <b>${fechaEstEst.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'})}</b>`:''}
+        </div>
+      </div>`;
+    }
+  }
+  document.getElementById('analisis-proyecciones').innerHTML=proyHtml||'<div class="msg">Sin datos.</div>';
+
+  // ── PATRONES DE TIEMPO ───────────────────────────────
+  let patronesHtml='';
+  if(pocosDatos){
+    patronesHtml=`<div class="hint-box">Se necesitan al menos ${MIN_DIAS} días de registros.</div>`;
+  } else {
+    // Consumo por día de la semana
+    const porDia=Array(7).fill(0);
+    const countDia=Array(7).fill(0);
+    todasCargas.forEach(l=>{porDia[l.fecha.getDay()]+=l.liters;countDia[l.fecha.getDay()]++;});
+    const maxDia=Math.max(...porDia);
+    patronesHtml='<div style="margin-bottom:1rem"><div style="font-size:12px;font-weight:600;color:#888;margin-bottom:8px">Litros por día de la semana</div>';
+    patronesHtml+=porDia.map((v,i)=>`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px">
+        <div style="width:80px;color:#666">${DIAS[i]}</div>
+        <div style="flex:1;background:#eee;border-radius:3px;height:8px;overflow:hidden">
+          <div style="height:100%;background:${v===maxDia?'#185FA5':'#9FE1CB'};width:${maxDia>0?Math.round(v/maxDia*100):0}%"></div>
+        </div>
+        <div style="width:60px;text-align:right;color:#888">${v.toFixed(0)} L</div>
+      </div>`).join('');
+    patronesHtml+='</div>';
+
+    // Consumo por hora del día
+    const porHora=Array(24).fill(0);
+    todasCargas.forEach(l=>{porHora[l.fecha.getHours()]+=l.liters;});
+    const horasPico=porHora.map((v,i)=>({h:i,v})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v).slice(0,3);
+    if(horasPico.length>0){
+      patronesHtml+=`<div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">Horarios más activos</div>`;
+      patronesHtml+=horasPico.map(x=>`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>${x.h}:00 - ${x.h+1}:00 hs</span><span class="badge b-info">${x.v.toFixed(0)} L</span></div>`).join('');
+    }
+
+    // Promedio de días entre recargas de cisterna
+    if(S.recargas.length>=2){
+      const recsOrd=[...S.recargas].sort((a,b)=>new Date(a.date)-new Date(b.date));
+      const diffs=[];
+      for(let i=1;i<recsOrd.length;i++){
+        const d=(new Date(recsOrd[i].date)-new Date(recsOrd[i-1].date))/86400000;
+        if(d>0&&d<120)diffs.push(d);
+      }
+      if(diffs.length>0){
+        const promDias=diffs.reduce((a,b)=>a+b,0)/diffs.length;
+        patronesHtml+=`<div style="margin-top:12px;padding:10px 12px;background:#f8f8f6;border-radius:8px;font-size:13px">
+          Frecuencia de recarga de cisternas: cada <b>${promDias.toFixed(0)} días</b> en promedio
+        </div>`;
+      }
+    }
+  }
+  document.getElementById('analisis-patrones').innerHTML=patronesHtml||'<div class="msg">Sin datos.</div>';
+
+  // ── RANKING EQUIPOS ──────────────────────────────────
+  const byEq={};
+  todasCargas.forEach(l=>{
+    const k=l.plate||l.equipoId||'?';
+    if(!byEq[k])byEq[k]={plate:k,tipo:l.tipoEquipo,total:0,ops:0};
+    byEq[k].total+=l.liters;byEq[k].ops++;
+  });
+  const rankEq=Object.values(byEq).sort((a,b)=>b.total-a.total).slice(0,10);
+  const maxEq=rankEq[0]?.total||1;
+  document.getElementById('analisis-equipos').innerHTML=rankEq.length?rankEq.map((e,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px">
+      <div style="width:20px;text-align:right;color:#aaa;font-size:11px">${i+1}</div>
+      <div style="flex:1">
+        <div style="font-weight:600">${e.plate} <span class="type-chip ${TCLASS(e.tipo)}">${TLABEL(e.tipo)}</span></div>
+        <div class="prog-bar" style="margin-top:3px"><div class="prog-fill" style="width:${Math.round(e.total/maxEq*100)}%"></div></div>
+      </div>
+      <div style="text-align:right;white-space:nowrap"><b>${e.total.toFixed(0)} L</b><br><span style="font-size:11px;color:#aaa">${e.ops} cargas</span></div>
+    </div>`).join(''):`<div class="msg">Sin datos.</div>`;
+
+  // ── RANKING CHOFERES ─────────────────────────────────
+  const byCh={};
+  todasCargas.forEach(l=>{
+    const k=l.driver||'?';
+    if(!byCh[k])byCh[k]={driver:k,total:0,ops:0};
+    byCh[k].total+=l.liters;byCh[k].ops++;
+  });
+  const rankCh=Object.values(byCh).sort((a,b)=>b.total-a.total).slice(0,10);
+  const maxCh=rankCh[0]?.total||1;
+  document.getElementById('analisis-choferes').innerHTML=rankCh.length?rankCh.map((c,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px">
+      <div style="width:20px;text-align:right;color:#aaa;font-size:11px">${i+1}</div>
+      <div style="flex:1">
+        <div style="font-weight:600">${c.driver}</div>
+        <div class="prog-bar" style="margin-top:3px"><div class="prog-fill" style="width:${Math.round(c.total/maxCh*100)}%;background:#3C3489"></div></div>
+      </div>
+      <div style="text-align:right;white-space:nowrap"><b>${c.total.toFixed(0)} L</b><br><span style="font-size:11px;color:#aaa">${c.ops} cargas</span></div>
+    </div>`).join(''):`<div class="msg">Sin datos.</div>`;
+
+  // ── INSIGHTS AUTOMÁTICOS ─────────────────────────────
+  const insights=[];
+  if(!pocosDatos){
+    // Día más activo
+    const maxDiaIdx=porDia.indexOf(Math.max(...porDia));
+    const avgDia=porDia.reduce((a,b)=>a+b,0)/7;
+    if(avgDia>0){
+      const pctMayor=Math.round((porDia[maxDiaIdx]-avgDia)/avgDia*100);
+      if(pctMayor>20)insights.push({tipo:'info',txt:`Los <b>${DIAS[maxDiaIdx]}</b> son el día de mayor consumo — un ${pctMayor}% por encima del promedio semanal.`});
+    }
+
+    // Equipo más consumidor
+    if(rankEq.length>0){
+      const pctTop=Math.round(rankEq[0].total/todasCargas.reduce((a,b)=>a+b.liters,0)*100);
+      insights.push({tipo:'warn',txt:`<b>${rankEq[0].plate}</b> concentra el ${pctTop}% del consumo total registrado.`});
+    }
+
+    // Proyección crítica
+    S.cisternas.forEach(c=>{
+      const cargasCist=recientes.filter(l=>l.cisternaId===c.id);
+      if(cargasCist.length>0){
+        const lDia=cargasCist.reduce((a,b)=>a+b.liters,0)/Math.max(1,(ahora-hace30)/86400000);
+        const dias=lDia>0?Math.floor(c.current/lDia):null;
+        if(dias!==null&&dias<=10)insights.push({tipo:'danger',txt:`<b>${c.nombre}</b> se estima que se vacía en <b>${dias} días</b>. Planificar recarga.`});
+      }
+    });
+
+    // Tendencia del último mes
+    const hace60=new Date(ahora-60*86400000);
+    const anteriores=todasCargas.filter(l=>l.fecha>=hace60&&l.fecha<hace30);
+    if(anteriores.length>0&&recientes.length>0){
+      const promReciente=recientes.reduce((a,b)=>a+b.liters,0)/30;
+      const promAnterior=anteriores.reduce((a,b)=>a+b.liters,0)/30;
+      if(promAnterior>0){
+        const cambio=Math.round((promReciente-promAnterior)/promAnterior*100);
+        if(Math.abs(cambio)>=10)insights.push({tipo:cambio>0?'warn':'ok',txt:`El consumo diario del último mes ${cambio>0?'aumentó':'bajó'} un <b>${Math.abs(cambio)}%</b> respecto al mes anterior.`});
+      }
+    }
+  }
+
+  document.getElementById('analisis-insights').innerHTML=insights.length
+    ?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:1rem">${insights.map(i=>`
+      <div class="alert ${i.tipo==='danger'?'al-d':i.tipo==='warn'?'al-w':i.tipo==='ok'?'al-o':'al-i'}" style="margin:0">${i.txt}</div>`).join('')}</div>`
+    :pocosDatos?`<div class="hint-box">Acumulá al menos ${MIN_DIAS} días de registros para ver insights automáticos.</div>`:'';
 }
 
 setInterval(async()=>{
