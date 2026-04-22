@@ -1177,7 +1177,7 @@ function renderCargas(){
         <td>${l.km||'-'}</td>
         <td>${l.registradoPor||'-'}</td>
         <td style="color:#aaa;font-size:12px">${l.detalle||l.obs||'-'}</td>
-        <td>${['Cisterna','Estación','Recarga cisterna','Depósito estación'].includes(l.fuente)?`
+        <td>${(l.fuente&&l.fuente!=='')?`
           <div style="position:relative;display:inline-block">
             <button class="btn sec" style="padding:4px 10px;font-size:16px;line-height:1" onclick="toggleMenu('menu-${l.id}')">⋮</button>
             <div id="menu-${l.id}" style="display:none;position:absolute;right:0;top:100%;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:50;min-width:130px;overflow:hidden">
