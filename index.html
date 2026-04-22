@@ -131,6 +131,14 @@ tr:last-child td{border-bottom:none}
 .tc-retro{background:#FAEEDA;color:#854F0B}
 .tc-calister{background:#E1F5EE;color:#0F6E56}
 .tc-otro{background:#f0f0ee;color:#555}
+.mas-menu{display:none;position:fixed;bottom:60px;right:0;left:0;background:#fff;border-top:1px solid #e0e0e0;z-index:19;padding:0.5rem 0;box-shadow:0 -4px 16px rgba(0,0,0,0.08)}
+.mas-menu.open{display:block}
+.mas-item{display:flex;align-items:center;gap:12px;padding:12px 1.5rem;cursor:pointer;color:#555;font-size:14px;font-weight:500;border:none;background:none;width:100%;text-align:left}
+.mas-item:hover{background:#f5f5f3;color:#185FA5}
+.mas-item.active{color:#185FA5;font-weight:700}
+.mas-item svg{width:20px;height:20px;flex-shrink:0}
+.mas-overlay{display:none;position:fixed;inset:0;z-index:18}
+.mas-overlay.open{display:block}
 .side-nav{display:none;position:fixed;left:0;top:54px;bottom:0;width:185px;background:#fff;border-right:1px solid #e0e0e0;flex-direction:column;padding:0.75rem 0;z-index:15;overflow-y:auto}
 .snav-item{display:flex;align-items:center;gap:10px;padding:10px 1.25rem;cursor:pointer;color:#666;font-size:13px;font-weight:500;border:none;background:none;width:100%;text-align:left}
 .snav-item:hover{background:#f5f5f3;color:#185FA5}
@@ -200,6 +208,8 @@ tr:last-child td{border-bottom:none}
   </div>
   <nav class="side-nav" id="side-nav"></nav>
   <nav class="bottom-nav" id="bottom-nav"></nav>
+  <div class="mas-overlay" id="mas-overlay" onclick="closeMasMenu()"></div>
+  <div class="mas-menu" id="mas-menu"></div>
   <div class="main">
     <div id="loading-screen" class="loading-screen">
       <div class="big-spin"></div>
@@ -757,8 +767,28 @@ function buildNav(){
   const role=currentUser.rol;
   const allowed=NAV_ITEMS.filter(n=>n.roles.includes(role));
   document.getElementById('side-nav').innerHTML=allowed.map(n=>`<button class="snav-item ${n.id==='panel'?'active':''}" onclick="show('${n.id}')" id="snav-${n.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${n.icon}"/></svg>${n.label}</button>`).join('');
-  const mobile=allowed.slice(0,5);
-  document.getElementById('bottom-nav').innerHTML=mobile.map(n=>`<button class="bnav-item ${n.id==='panel'?'active':''}" onclick="show('${n.id}')" id="bnav-${n.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${n.icon}"/></svg>${n.label}</button>`).join('');
+  const mobile=allowed.slice(0,4);
+  const extra=allowed.slice(4);
+  let bottomHtml=mobile.map(n=>`<button class="bnav-item ${n.id==='panel'?'active':''}" onclick="show('${n.id}')" id="bnav-${n.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${n.icon}"/></svg>${n.label}</button>`).join('');
+  if(extra.length>0){
+    bottomHtml+=`<button class="bnav-item" id="bnav-mas" onclick="toggleMasMenu()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Más</button>`;
+    document.getElementById('mas-menu').innerHTML=extra.map(n=>`<button class="mas-item" onclick="show('${n.id}');closeMasMenu()" id="mitem-${n.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${n.icon}"/></svg>${n.label}</button>`).join('');
+  }
+  document.getElementById('bottom-nav').innerHTML=bottomHtml;
+}
+
+function toggleMasMenu(){
+  const menu=document.getElementById('mas-menu');
+  const overlay=document.getElementById('mas-overlay');
+  const btn=document.getElementById('bnav-mas');
+  const isOpen=menu.classList.contains('open');
+  if(isOpen){closeMasMenu();}
+  else{menu.classList.add('open');overlay.classList.add('open');if(btn)btn.classList.add('active');}
+}
+function closeMasMenu(){
+  document.getElementById('mas-menu')?.classList.remove('open');
+  document.getElementById('mas-overlay')?.classList.remove('open');
+  document.getElementById('bnav-mas')?.classList.remove('active');
 }
 
 function show(id){
