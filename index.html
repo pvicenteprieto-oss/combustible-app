@@ -1482,7 +1482,7 @@ function abrirEditRecargaDeposito(id, fuente){
   setAlert('edit-mov-alert','');
 
   const titulo=fuente==='Recarga cisterna'?'Editar recarga de cisterna':'Editar depósito de estación';
-  document.getElementById('edit-mov-title').innerHTML=titulo+' <button class="modal-close" onclick="closeModal('modal-edit-movimiento')">✕</button>';
+  document.getElementById('edit-mov-title').innerHTML=titulo+` <button class="modal-close" onclick="closeModal('modal-edit-movimiento')">✕</button>`;
 
   const litrosActual=+(mov.liters||mov.litros||0);
   const infoText=fuente==='Recarga cisterna'
