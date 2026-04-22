@@ -529,7 +529,6 @@ tr:last-child td{border-bottom:none}
     <div class="row2">
       <div class="fg"><label>¿Tiene tacómetro?</label>
         <select id="eq-taco"><option value="1">Sí</option><option value="0">No</option></select></div>
-      <div class="fg"><label>Chofer habitual (opcional)</label><input id="eq-driver"/></div>
     </div>
     <div class="btn-row">
       <button class="btn sec" onclick="closeModal('modal-add-equipo')">Cancelar</button>
@@ -1396,10 +1395,10 @@ function renderEquipos(){
   const adm=currentUser.rol==='admin';
   document.getElementById('btn-add-equipo').style.display=adm?'':'none';
   const lista=S.equipos.filter(e=>!filtro||e.tipo===filtro);
-  document.getElementById('equipos-list').innerHTML=lista.length?lista.map(e=>{const p=calcPerfil(e.id);return`<div class="item-card"><div class="ic-row"><div><div class="ic-title">${e.plate} <span class="type-chip ${TCLASS(e.tipo)}">${TLABEL(e.tipo)}</span></div><div class="ic-sub">${e.model||'-'}${e.driver?' — '+e.driver:''}</div>${p?`<div class="ic-sub">Consumo prom: ${p.median.toFixed(1)} L/h (${p.n} registros)</div>`:''}</div>${adm?`<button class="btn sec" style="padding:4px 10px;font-size:12px;color:#A32D2D" onclick="removeEquipo('${e.id}')">Quitar</button>`:''}</div></div>`;}).join(''):`<div class="msg">Sin equipos${filtro?' de ese tipo':''}.</div>`;
+  document.getElementById('equipos-list').innerHTML=lista.length?lista.map(e=>{const p=calcPerfil(e.id);return`<div class="item-card"><div class="ic-row"><div><div class="ic-title">${e.plate} <span class="type-chip ${TCLASS(e.tipo)}">${TLABEL(e.tipo)}</span></div><div class="ic-sub">${e.model||'-'}</div>${p?`<div class="ic-sub">Consumo prom: ${p.median.toFixed(1)} L/h (${p.n} registros)</div>`:''}</div>${adm?`<button class="btn sec" style="padding:4px 10px;font-size:12px;color:#A32D2D" onclick="removeEquipo('${e.id}')">Quitar</button>`:''}</div></div>`;}).join(''):`<div class="msg">Sin equipos${filtro?' de ese tipo':''}.</div>`;
 }
 async function addEquipo(){
-  const plate=document.getElementById('eq-id').value.trim().toUpperCase(),model=document.getElementById('eq-model').value.trim(),tipo=document.getElementById('eq-type').value,quota=+document.getElementById('eq-quota').value||80,hasTacometer=document.getElementById('eq-taco').value==='1',driver=document.getElementById('eq-driver').value.trim();
+  const plate=document.getElementById('eq-id').value.trim().toUpperCase(),model=document.getElementById('eq-model').value.trim(),tipo=document.getElementById('eq-type').value,quota=+document.getElementById('eq-quota').value||80,hasTacometer=document.getElementById('eq-taco').value==='1';
   if(!plate||!model){alert('Completá identificador y descripción.');return;}
   if(S.equipos.find(e=>e.plate===plate)){alert('Ya existe un equipo con ese identificador.');return;}
   const eq={id:uid(),plate,model,tipo,quota,hasTacometer,driver};
