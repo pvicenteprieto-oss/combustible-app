@@ -635,6 +635,24 @@ tr:last-child td{border-bottom:none}
     </div>
   </div>
 </div>
+<!-- MODAL EDITAR RECARGA/DEPÓSITO -->
+<div class="overlay" id="modal-edit-movimiento">
+  <div class="modal">
+    <div class="modal-title" id="edit-mov-title">Editar movimiento <button class="modal-close" onclick="closeModal('modal-edit-movimiento')">✕</button></div>
+    <div class="hint-box" id="edit-mov-info"></div>
+    <input type="hidden" id="edit-mov-id"/>
+    <input type="hidden" id="edit-mov-fuente"/>
+    <input type="hidden" id="edit-mov-litros-orig"/>
+    <div id="edit-mov-campos"></div>
+    <div class="fg"><label>Motivo de la modificación</label><input id="edit-mov-motivo" placeholder="Obligatorio — explicá el motivo del cambio"/></div>
+    <div id="edit-mov-alert"></div>
+    <div class="btn-row">
+      <button class="btn sec" onclick="closeModal('modal-edit-movimiento')">Cancelar</button>
+      <button class="btn pri" onclick="guardarEditMovimiento()">Guardar cambios ↗</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL EDITAR CARGA -->
 <div class="overlay" id="modal-edit-carga">
   <div class="modal">
@@ -1163,8 +1181,8 @@ function renderCargas(){
           <div style="position:relative;display:inline-block">
             <button class="btn sec" style="padding:4px 10px;font-size:16px;line-height:1" onclick="toggleMenu('menu-${l.id}')">⋮</button>
             <div id="menu-${l.id}" style="display:none;position:absolute;right:0;top:100%;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:50;min-width:130px;overflow:hidden">
-              <button onclick="abrirEditCarga('${l.id}','${l.fuente}');toggleMenu('menu-${l.id}')" style="display:block;width:100%;padding:10px 16px;text-align:left;border:none;background:#fff;cursor:pointer;font-size:13px;color:#1a1a1a">Editar</button>
-              <button onclick="eliminarCarga('${l.id}','${l.fuente}');toggleMenu('menu-${l.id}')" style="display:block;width:100%;padding:10px 16px;text-align:left;border:none;background:#fff;cursor:pointer;font-size:13px;color:#A32D2D;border-top:1px solid #f0f0f0">Eliminar</button>
+              <button onclick="abrirEditMovimiento('${l.id}','${l.fuente}');toggleMenu('menu-${l.id}')" style="display:block;width:100%;padding:10px 16px;text-align:left;border:none;background:#fff;cursor:pointer;font-size:13px;color:#1a1a1a">Editar</button>
+              <button onclick="eliminarMovimiento('${l.id}','${l.fuente}');toggleMenu('menu-${l.id}')" style="display:block;width:100%;padding:10px 16px;text-align:left;border:none;background:#fff;cursor:pointer;font-size:13px;color:#A32D2D;border-top:1px solid #f0f0f0">Eliminar</button>
             </div>
           </div>
         `:'—'}</td>
@@ -1440,6 +1458,185 @@ document.querySelectorAll('.pin-key').forEach(b=>b.disabled=true);
   }
   setLoginReady();
 })();
+// ── MENU ACCIONES ────────────────────────────────────────
+// Wrapper unificado — decide si es carga, recarga o depósito
+function abrirEditMovimiento(id, fuente){
+  if(fuente==='Cisterna'||fuente==='Estación') abrirEditCarga(id, fuente);
+  else abrirEditRecargaDeposito(id, fuente);
+}
+function eliminarMovimiento(id, fuente){
+  if(fuente==='Cisterna'||fuente==='Estación') eliminarCarga(id, fuente);
+  else eliminarRecargaDeposito(id, fuente);
+}
+
+function abrirEditRecargaDeposito(id, fuente){
+  let mov=null;
+  if(fuente==='Recarga cisterna') mov=S.recargas.find(r=>r.id===id);
+  else mov=S.depositos.find(d=>d.id===id);
+  if(!mov){alert('Registro no encontrado.');return;}
+
+  document.getElementById('edit-mov-id').value=id;
+  document.getElementById('edit-mov-fuente').value=fuente;
+  document.getElementById('edit-mov-litros-orig').value=mov.liters||mov.litros||0;
+  document.getElementById('edit-mov-motivo').value='';
+  setAlert('edit-mov-alert','');
+
+  const titulo=fuente==='Recarga cisterna'?'Editar recarga de cisterna':'Editar depósito de estación';
+  document.getElementById('edit-mov-title').innerHTML=titulo+' <button class="modal-close" onclick="closeModal('modal-edit-movimiento')">✕</button>';
+
+  const litrosActual=+(mov.liters||mov.litros||0);
+  const infoText=fuente==='Recarga cisterna'
+    ?`Recarga original: ${S.cisternas.find(c=>c.id===mov.cisternaId)?.nombre||'-'} — ${litrosActual.toFixed(0)} L — ${fdt(mov.date)}`
+    :`Depósito original: $${(+mov.monto||0).toLocaleString('es-AR')} — ${litrosActual.toFixed(1)} L — ${fdt(mov.fecha||mov.date)}`;
+  document.getElementById('edit-mov-info').textContent=infoText;
+
+  let campos='';
+  if(fuente==='Recarga cisterna'){
+    const cists=S.cisternas.map(c=>`<option value="${c.id}" ${c.id===mov.cisternaId?'selected':''}>${c.nombre} — ${c.combustible}</option>`).join('');
+    campos=`
+      <div class="row2">
+        <div class="fg"><label>Cisterna</label><select id="emov-cisterna">${cists}</select></div>
+        <div class="fg"><label>Litros</label><input id="emov-litros" type="number" min="1" value="${litrosActual}"/></div>
+      </div>
+      <div class="row2">
+        <div class="fg"><label>Precio por litro ($)</label><input id="emov-precio" type="number" step="0.01" value="${+mov.price||0}"/></div>
+        <div class="fg"><label>Estación</label><input id="emov-estacion" value="${mov.station||''}"/></div>
+      </div>
+      <div class="row2">
+        <div class="fg"><label>N° remito</label><input id="emov-remito" value="${mov.receipt||''}"/></div>
+        <div class="fg"><label>Fecha y hora</label><input id="emov-fecha" type="datetime-local" value="${mov.date||''}"/></div>
+      </div>
+      <div class="fg"><label>Responsable</label><input id="emov-resp" value="${mov.resp||''}"/></div>`;
+  } else {
+    campos=`
+      <div class="row2">
+        <div class="fg"><label>Monto depositado ($)</label><input id="emov-monto" type="number" min="1" step="0.01" value="${+mov.monto||0}" oninput="recalcLitrosDeposito()"/></div>
+        <div class="fg"><label>Precio por litro ($)</label><input id="emov-dprecio" type="number" min="0.01" step="0.01" value="${+mov.precio||0}" oninput="recalcLitrosDeposito()"/></div>
+      </div>
+      <div id="emov-litros-preview" style="padding:9px 12px;background:#f0faf0;border-radius:8px;border-left:3px solid #3B6D11;font-size:13px;color:#3B6D11;margin-bottom:12px">
+        Litros equivalentes: <b id="emov-litros-val">${litrosActual.toFixed(1)}</b> L
+      </div>
+      <div class="row2">
+        <div class="fg"><label>Fecha</label><input id="emov-fecha" type="datetime-local" value="${mov.fecha||mov.date||''}"/></div>
+        <div class="fg"><label>N° comprobante</label><input id="emov-comprobante" value="${mov.comprobante||''}"/></div>
+      </div>
+      <div class="fg"><label>Observaciones</label><input id="emov-obs" value="${mov.obs||''}"/></div>`;
+  }
+  document.getElementById('edit-mov-campos').innerHTML=campos;
+  showModal('modal-edit-movimiento');
+}
+
+function recalcLitrosDeposito(){
+  const monto=+document.getElementById('emov-monto')?.value||0;
+  const precio=+document.getElementById('emov-dprecio')?.value||0;
+  const val=document.getElementById('emov-litros-val');
+  if(val&&precio>0)val.textContent=(monto/precio).toFixed(1);
+}
+
+async function guardarEditMovimiento(){
+  const id=document.getElementById('edit-mov-id').value;
+  const fuente=document.getElementById('edit-mov-fuente').value;
+  const litrosOrig=+document.getElementById('edit-mov-litros-orig').value||0;
+  const motivo=document.getElementById('edit-mov-motivo').value.trim();
+  if(!motivo){setAlert('edit-mov-alert','El motivo es obligatorio.','w');return;}
+
+  try{
+    let litrosNew=0;
+    if(fuente==='Recarga cisterna'){
+      const cisternaId=document.getElementById('emov-cisterna').value;
+      litrosNew=+document.getElementById('emov-litros').value||0;
+      if(!litrosNew||litrosNew<=0){setAlert('edit-mov-alert','Ingresá los litros.','w');return;}
+      const price=+document.getElementById('emov-precio').value||0;
+      const station=document.getElementById('emov-estacion').value.trim();
+      const receipt=document.getElementById('emov-remito').value.trim();
+      const fecha=document.getElementById('emov-fecha').value;
+      const resp=document.getElementById('emov-resp').value.trim();
+      const rec=S.recargas.find(r=>r.id===id);
+      const updated={...rec,cisternaId,liters:litrosNew,price,total:price*litrosNew,station,receipt,date:fecha,resp,modificadoPor:currentUser.nombre||currentUser.username,fechaModif:now()};
+      await api({action:'updateRecarga',data:JSON.stringify(updated)});
+      Object.assign(rec,updated);
+      // Ajustar nivel cisterna por la diferencia
+      const diff=litrosNew-litrosOrig;
+      if(diff!==0){
+        const cist=S.cisternas.find(c=>c.id===cisternaId);
+        if(cist){
+          const newLevel=Math.min(cist.capacidad,Math.max(0,cist.current+diff));
+          await api({action:'updateCisterna',id:cisternaId,value:newLevel});
+          cist.current=newLevel;
+          // También ajustar saldo estación (la recarga de cisterna consume del saldo)
+          const newSaldo=Math.max(0,parseFloat(((S.estacion_saldo?.litros||0)-diff).toFixed(2)));
+          await api({action:'updateEstacionSaldo',value:newSaldo});
+          S.estacion_saldo={litros:newSaldo};
+        }
+      }
+    } else {
+      // Depósito estación
+      const monto=+document.getElementById('emov-monto').value||0;
+      const precio=+document.getElementById('emov-dprecio').value||0;
+      if(!monto||!precio){setAlert('edit-mov-alert','Ingresá monto y precio.','w');return;}
+      litrosNew=parseFloat((monto/precio).toFixed(2));
+      const fecha=document.getElementById('emov-fecha').value;
+      const comprobante=document.getElementById('emov-comprobante').value.trim();
+      const obs=document.getElementById('emov-obs').value.trim();
+      const dep=S.depositos.find(d=>d.id===id);
+      const updated={...dep,monto,precio,litros:litrosNew,fecha,comprobante,obs,modificadoPor:currentUser.nombre||currentUser.username,fechaModif:now()};
+      await api({action:'updateDeposito',data:JSON.stringify(updated)});
+      Object.assign(dep,updated);
+      // Ajustar saldo estación por la diferencia
+      const diff=litrosNew-litrosOrig;
+      if(diff!==0){
+        const newSaldo=Math.max(0,parseFloat(((S.estacion_saldo?.litros||0)+diff).toFixed(2)));
+        await api({action:'updateEstacionSaldo',value:newSaldo});
+        S.estacion_saldo={litros:newSaldo};
+      }
+    }
+    // Auditoría
+    const audit={id:uid(),fecha:now(),tipo:'modificacion',fuente,cargaId:id,usuario:currentUser.nombre||currentUser.username,motivo,litrosAntes:litrosOrig,litrosDespues:litrosNew,cambios:`${fuente} modificado — ${litrosOrig}→${litrosNew} L`};
+    await api({action:'addAuditoria',data:JSON.stringify(audit)});
+    S.auditoria.push(audit);
+    closeModal('modal-edit-movimiento');
+    renderCargas();renderPanel();
+  }catch(e){setAlert('edit-mov-alert','Error: '+e.message,'d');}
+}
+
+async function eliminarRecargaDeposito(id, fuente){
+  let mov=null;
+  if(fuente==='Recarga cisterna') mov=S.recargas.find(r=>r.id===id);
+  else mov=S.depositos.find(d=>d.id===id);
+  if(!mov){alert('Registro no encontrado.');return;}
+  const litros=+(mov.liters||mov.litros||0);
+  const motivo=prompt(`¿Eliminar ${fuente} de ${litros.toFixed(0)} L — ${fdt(mov.date||mov.fecha)}?\n\nIngresá el motivo (obligatorio):`);
+  if(motivo===null)return;
+  if(!motivo.trim()){alert('El motivo es obligatorio.');return;}
+  try{
+    if(fuente==='Recarga cisterna'){
+      await api({action:'deleteRecarga',id});
+      S.recargas=S.recargas.filter(r=>r.id!==id);
+      // Revertir: quitar litros de la cisterna y devolver al saldo estación
+      const cist=S.cisternas.find(c=>c.id===mov.cisternaId);
+      if(cist){
+        const newLevel=Math.max(0,cist.current-litros);
+        await api({action:'updateCisterna',id:mov.cisternaId,value:newLevel});
+        cist.current=newLevel;
+      }
+      const newSaldo=parseFloat(((S.estacion_saldo?.litros||0)+litros).toFixed(2));
+      await api({action:'updateEstacionSaldo',value:newSaldo});
+      S.estacion_saldo={litros:newSaldo};
+    } else {
+      await api({action:'deleteDeposito',id});
+      S.depositos=S.depositos.filter(d=>d.id!==id);
+      // Revertir: quitar litros del saldo estación
+      const newSaldo=Math.max(0,parseFloat(((S.estacion_saldo?.litros||0)-litros).toFixed(2)));
+      await api({action:'updateEstacionSaldo',value:newSaldo});
+      S.estacion_saldo={litros:newSaldo};
+    }
+    const audit={id:uid(),fecha:now(),tipo:'eliminacion',fuente,cargaId:id,usuario:currentUser.nombre||currentUser.username,motivo:motivo.trim(),litrosAntes:litros,litrosDespues:0,cambios:`Eliminación de ${fuente} de ${litros.toFixed(0)} L`};
+    await api({action:'addAuditoria',data:JSON.stringify(audit)});
+    S.auditoria.push(audit);
+    renderCargas();renderPanel();
+  }catch(e){alert('Error: '+e.message);}
+}
+
 // ── MENU ACCIONES ────────────────────────────────────────
 function toggleMenu(id){
   // Cerrar todos los otros menús primero
