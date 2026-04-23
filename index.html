@@ -1179,7 +1179,8 @@ function renderCargas(){
       combustible:FLABEL(l.combustible)||'-',
       contrato:l.contratoNombre||'', contratoId:l.contratoId||'',
       tacometro:'', km:'', obs:l.obs||'', fuente:'Estación', remito:l.receipt||'',
-      registradoPor:l.registradoPor||'', detalle:l.receipt?`Remito: ${l.receipt}`:''
+      registradoPor:l.registradoPor||'', detalle:l.receipt?`Remito: ${l.receipt}`:'',
+      superaSaldo:l.superaSaldo||false
     }))
   ];
 
@@ -1221,12 +1222,7 @@ function renderCargas(){
         <td>${l.chofer}</td>
         <td>${l.litros.toFixed(0)} L</td>
         <td>${l.combustible}</td>
-        <td><span class="badge ${{
-          'Cisterna':'b-info',
-          'Estación':'b-teal',
-          'Recarga cisterna':'b-purple',
-          'Depósito estación':'b-ok'
-        }[l.fuente]||'b-gray'}">${l.fuente}</span></td>
+        <td>${l.superaSaldo?'<span class="badge b-dan" style="margin-right:4px">⚠ Excedió saldo</span>':''}<span class="badge ${{'Cisterna':'b-info','Estación':'b-teal','Recarga cisterna':'b-purple','Depósito estación':'b-ok'}[l.fuente]||'b-gray'}">${l.fuente}</span></td>
         <td>${l.contrato||'-'}</td>
         <td>${l.tacometro||'-'}</td>
         <td>${l.km||'-'}</td>
@@ -1280,6 +1276,9 @@ async function registrarCargaEstacion(){
     // Descontar del saldo estación
     const saldoActual=S.estacion_saldo?.litros||0;
     let newSaldoEst=parseFloat((saldoActual-liters).toFixed(2));
+    if(newSaldoEst<0) reg.superaSaldo=true;
+    const superaSaldo=newSaldoEst<0;
+    if(superaSaldo) reg.superaSaldo=true;
 
     // Si el saldo queda negativo, recalcular el último depósito
     let mensajeExtra='';
