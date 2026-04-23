@@ -959,7 +959,7 @@ function renderFormCarga(){
   const selC=document.getElementById('cc-cisterna');
   if(selC){const cv=selC.value;selC.innerHTML=S.cisternas.map(c=>`<option value="${c.id}">${c.nombre} — ${c.combustible} (${c.current.toFixed(0)} L)</option>`).join('');if(cv)selC.value=cv;}
   const selE=document.getElementById('cc-equipo');
-  if(selE){const cv=selE.value;selE.innerHTML=S.equipos.map(e=>`<option value="${e.id}">${e.plate} — ${TLABEL(e.tipo)}</option>`).join('');if(cv)selE.value=cv;}
+  if(selE){const cv=selE.value;selE.innerHTML=[...S.equipos].sort((a,b)=>a.plate.localeCompare(b.plate,'es')).map(e=>`<option value="${e.id}">${e.plate} — ${TLABEL(e.tipo)}</option>`).join('');if(cv)selE.value=cv;}
   const selCont=document.getElementById('cc-contrato');
   if(selCont)selCont.innerHTML='<option value="">Sin contrato</option>'+S.contratos.filter(c=>c.estado==='activo').map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
   if(!document.getElementById('cc-date').value)document.getElementById('cc-date').value=now();
@@ -1008,7 +1008,8 @@ function buildChoferSelector(selId, manualId){
   const sel=document.getElementById(selId);
   const manual=document.getElementById(manualId);
   if(!sel)return;
-  sel.innerHTML='<option value="">-- Seleccioná chofer --</option>'+S.choferes.filter(c=>c.activo!=='false').map(c=>`<option value="${c.nombre}">${c.nombre}${c.legajo?' ('+c.legajo+')':''}</option>`).join('')+'<option value="__otro__">Otro / ingresar manualmente</option>';
+  const chofsOrd=[...S.choferes].filter(c=>c.activo!=='false').sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  sel.innerHTML='<option value="">-- Seleccioná chofer --</option>'+chofsOrd.map(c=>`<option value="${c.nombre}">${c.nombre}${c.legajo?' ('+c.legajo+')':''}</option>`).join('')+'<option value="__otro__">Otro / ingresar manualmente</option>';
   if(manual)manual.style.display='none';
 }
 function onChoferChange(selId, manualId){
@@ -1025,7 +1026,8 @@ function getChoferValue(selId, manualId){
 function renderChoferes(){
   const adm=currentUser.rol==='admin';
   document.getElementById('btn-add-chofer').style.display=adm?'':'none';
-  document.getElementById('choferes-list').innerHTML=S.choferes.length?S.choferes.map(c=>`
+  const chofOrd=[...S.choferes].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  document.getElementById('choferes-list').innerHTML=chofOrd.length?chofOrd.map(c=>`
     <div class="item-card">
       <div class="ic-row">
         <div>
@@ -1469,7 +1471,7 @@ function renderEquipos(){
   const filtro=document.getElementById('eq-filter')?.value||'';
   const adm=currentUser.rol==='admin';
   document.getElementById('btn-add-equipo').style.display=adm?'':'none';
-  const lista=S.equipos.filter(e=>!filtro||e.tipo===filtro);
+  const lista=S.equipos.filter(e=>!filtro||e.tipo===filtro).sort((a,b)=>a.plate.localeCompare(b.plate,'es'));
   document.getElementById('equipos-list').innerHTML=lista.length?lista.map(e=>{const p=calcPerfil(e.id);return`<div class="item-card"><div class="ic-row"><div><div class="ic-title">${e.plate} <span class="type-chip ${TCLASS(e.tipo)}">${TLABEL(e.tipo)}</span></div><div class="ic-sub">${e.model||'-'}</div>${p?`<div class="ic-sub">Consumo prom: ${p.median.toFixed(1)} L/h (${p.n} registros)</div>`:''}</div>${adm?`<button class="btn sec" style="padding:4px 10px;font-size:12px;color:#A32D2D" onclick="removeEquipo('${e.id}')">Quitar</button>`:''}</div></div>`;}).join(''):`<div class="msg">Sin equipos${filtro?' de ese tipo':''}.</div>`;
 }
 async function addEquipo(){
