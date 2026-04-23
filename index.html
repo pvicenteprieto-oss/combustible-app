@@ -957,9 +957,9 @@ function renderPanel(){
 // ── FORM CARGA CISTERNA ──────────────────────────────────
 function renderFormCarga(){
   const selC=document.getElementById('cc-cisterna');
-  if(selC)selC.innerHTML=S.cisternas.map(c=>`<option value="${c.id}">${c.nombre} — ${c.combustible} (${c.current.toFixed(0)} L)</option>`).join('');
+  if(selC){const cv=selC.value;selC.innerHTML=S.cisternas.map(c=>`<option value="${c.id}">${c.nombre} — ${c.combustible} (${c.current.toFixed(0)} L)</option>`).join('');if(cv)selC.value=cv;}
   const selE=document.getElementById('cc-equipo');
-  if(selE)selE.innerHTML=S.equipos.map(e=>`<option value="${e.id}">${e.plate} — ${TLABEL(e.tipo)}</option>`).join('');
+  if(selE){const cv=selE.value;selE.innerHTML=S.equipos.map(e=>`<option value="${e.id}">${e.plate} — ${TLABEL(e.tipo)}</option>`).join('');if(cv)selE.value=cv;}
   const selCont=document.getElementById('cc-contrato');
   if(selCont)selCont.innerHTML='<option value="">Sin contrato</option>'+S.contratos.filter(c=>c.estado==='activo').map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
   if(!document.getElementById('cc-date').value)document.getElementById('cc-date').value=now();
@@ -969,8 +969,11 @@ function renderFormCarga(){
 
 function onEquipoChange(){
   const eq=S.equipos.find(e=>e.id===document.getElementById('cc-equipo').value);
-  if(eq&&eq.driver)document.getElementById('cc-driver').value=eq.driver;
-  updateCuotaPanelCarga();updateCargaPreview();
+  // Actualizar panel de cuota de forma diferida para no bloquear el UI
+  requestAnimationFrame(()=>{
+    updateCuotaPanelCarga();
+    updateCargaPreview();
+  });
 }
 
 function checkMedicion(){
