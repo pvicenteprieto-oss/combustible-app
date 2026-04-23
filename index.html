@@ -1348,6 +1348,18 @@ async function salvarDiferencia(cisternaId){
     await api({action:'updateCisterna',id:cisternaId,value:0});
     S.ajustes.push(ajuste);
     c.current=0;
+    // Registrar como movimiento en cargas con litros negativos (diferencia)
+    const movDif={
+      id:uid(), cisternaId, equipoId:'', plate:'-', tipoEquipo:'-',
+      driver:'-', liters:-(+diff), tacometer:'', km:'', horasJornada:0,
+      date:now(), obs:`Diferencia de calibración salvada: ${diff} L`,
+      contratoId:'', contratoNombre:'',
+      cisternaBefore:ajuste.litrosAntes, cisternaAfter:0,
+      registradoPor:currentUser.nombre||currentUser.username,
+      tipo:'ajuste_diferencia'
+    };
+    await api({action:'addCarga',data:JSON.stringify(movDif)});
+    S.cargas.push(movDif);
     // También registrar en auditoría
     const audit={id:uid(),fecha:now(),tipo:'ajuste',fuente:'Cisterna',cargaId:ajuste.id,usuario:currentUser.nombre||currentUser.username,motivo:ajuste.motivo,litrosAntes:ajuste.litrosAntes,litrosDespues:0,cambios:`Diferencia salvada en ${c.nombre}: ${diff} L`};
     await api({action:'addAuditoria',data:JSON.stringify(audit)});
