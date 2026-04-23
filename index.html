@@ -1278,10 +1278,34 @@ async function registrarCargaEstacion(){
     await api({action:'addCargaEstacion',data:JSON.stringify(reg)});
     S.cargas_estacion.push(reg);
     // Descontar del saldo estación
-    const newSaldoEst=Math.max(0,parseFloat(((S.estacion_saldo?.litros||0)-liters).toFixed(2)));
-    await api({action:'updateEstacionSaldo',value:newSaldoEst});
-    S.estacion_saldo={litros:newSaldoEst};
-    setAlert('en-alert','Carga en estación registrada correctamente.','o');
+    const saldoActual=S.estacion_saldo?.litros||0;
+    let newSaldoEst=parseFloat((saldoActual-liters).toFixed(2));
+
+    // Si el saldo queda negativo, recalcular el último depósito
+    let mensajeExtra='';
+    if(newSaldoEst<0&&S.depositos.length>0){
+      // Buscar el último depósito
+      const depOrd=[...S.depositos].sort((a,b)=>new Date(b.fecha||b.date)-new Date(a.fecha||a.date));
+      const ultimoDep=depOrd[0];
+      // Calcular litros reales despachados desde ese depósito
+      const fechaDep=new Date(ultimoDep.fecha||ultimoDep.date);
+      const cargasDesdeUltimoDep=S.cargas_estacion.filter(c=>new Date(c.date)>=fechaDep);
+      const litrosReales=cargasDesdeUltimoDep.reduce((a,b)=>a+(+b.liters||0),0);
+      const montoDep=+ultimoDep.monto||0;
+      // Recalcular precio promedio
+      const precioPromedio=litrosReales>0?parseFloat((montoDep/litrosReales).toFixed(2)):+ultimoDep.precio;
+      const depActualizado={...ultimoDep,litros:litrosReales,precio:precioPromedio,
+        litrosRecalculados:true,fechaRecalculo:now(),
+        obs:(ultimoDep.obs||'')+` [Recalculado: ${litrosReales.toFixed(1)} L a $${precioPromedio.toFixed(2)}/L]`};
+      await api({action:'updateDeposito',data:JSON.stringify(depActualizado)});
+      Object.assign(ultimoDep,depActualizado);
+      newSaldoEst=0;
+      mensajeExtra=` El último depósito fue recalculado: ${litrosReales.toFixed(0)} L a $${precioPromedio.toFixed(2)}/L promedio.`;
+    }
+
+    await api({action:'updateEstacionSaldo',value:Math.max(0,newSaldoEst)});
+    S.estacion_saldo={litros:Math.max(0,newSaldoEst)};
+    setAlert('en-alert','Carga en estación registrada correctamente.'+mensajeExtra,'o');
     ['en-liters','en-receipt','en-price','en-obs'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('en-driver-sel').value='';
     document.getElementById('en-driver-manual').value='';
@@ -1973,6 +1997,43 @@ function renderAnalisis(){
     }
   }
   document.getElementById('analisis-proyecciones').innerHTML=proyHtml||'<div class="msg">Sin datos.</div>';
+
+  // ── ANÁLISIS DE PRECIO POR DEPÓSITO ──────────────────
+  // Agregar al final de proyecciones
+  if(S.depositos.length>0){
+    const depOrd=[...S.depositos].sort((a,b)=>new Date(a.fecha||a.date)-new Date(b.fecha||b.date));
+    let precioHtml='<div class="sep"></div><div style="font-size:12px;font-weight:600;color:#888;margin-bottom:8px">Precio promedio por depósito</div>';
+    depOrd.forEach((dep,i)=>{
+      const fechaDep=new Date(dep.fecha||dep.date);
+      const fechaSig=depOrd[i+1]?new Date(depOrd[i+1].fecha||depOrd[i+1].date):new Date();
+      const cargasDep=S.cargas_estacion.filter(c=>{const d=new Date(c.date);return d>=fechaDep&&d<fechaSig;});
+      const litrosDep=cargasDep.reduce((a,b)=>a+(+b.liters||0),0);
+      const monto=+dep.monto||0;
+      const precioReal=litrosDep>0?monto/litrosDep:+dep.precio||0;
+      const precioPres=+dep.precio||0;
+      const diff=precioPres>0?((precioReal-precioPres)/precioPres*100):0;
+      precioHtml+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px;flex-wrap:wrap;gap:6px">
+        <div>
+          <div style="font-weight:600">${(dep.fecha||dep.date||'').slice(0,10)}</div>
+          <div style="font-size:12px;color:#888">$${monto.toLocaleString('es-AR')} — ${litrosDep.toFixed(0)} L despachados</div>
+        </div>
+        <div style="text-align:right">
+          <span class="badge ${Math.abs(diff)>10?(diff>0?'b-dan':'b-ok'):'b-gray'}">$${precioReal.toFixed(2)}/L real</span>
+          ${Math.abs(diff)>1?`<div style="font-size:11px;color:#888;margin-top:2px">Estimado: $${precioPres.toFixed(2)}/L (${diff>0?'+':''}${diff.toFixed(0)}%)</div>`:''}
+        </div>
+      </div>`;
+    });
+    // Precio promedio global
+    const totalMonto=depOrd.reduce((a,b)=>a+(+b.monto||0),0);
+    const totalLitrosEst=S.cargas_estacion.reduce((a,b)=>a+(+b.liters||0),0);
+    const precioGlobal=totalLitrosEst>0?totalMonto/totalLitrosEst:0;
+    if(precioGlobal>0){
+      precioHtml+=`<div style="margin-top:10px;padding:10px 12px;background:#f8f8f6;border-radius:8px;font-size:13px">
+        Precio promedio global: <b>$${precioGlobal.toFixed(2)}/L</b> — $${totalMonto.toLocaleString('es-AR')} en ${totalLitrosEst.toFixed(0)} L
+      </div>`;
+    }
+    document.getElementById('analisis-proyecciones').innerHTML+=precioHtml;
+  }
 
   // ── PATRONES DE TIEMPO ───────────────────────────────
   let patronesHtml='';
