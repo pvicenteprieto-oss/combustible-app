@@ -1419,7 +1419,13 @@ function openRecargaCisterna(id){
   showModal('modal-recarga-cisterna');
 }
 async function recargarCisterna(){
-  const cId=document.getElementById('rc-cisterna').value,liters=+document.getElementById('rc-liters').value,price=+document.getElementById('rc-price').value||0,station=document.getElementById('rc-station').value.trim(),receipt=document.getElementById('rc-receipt').value.trim(),resp=document.getElementById('rc-resp').value.trim(),date=document.getElementById('rc-date').value||now();
+  const cId=document.getElementById('rc-cisterna').value;
+  const cNeg=S.cisternas.find(x=>x.id===cId);
+  if(cNeg&&cNeg.current<0){
+    setAlert('rc-alert',`No se puede recargar ${cNeg.nombre} con saldo negativo (${cNeg.current.toFixed(0)} L). Primero salvá la diferencia desde el Panel.`,'d');
+    return;
+  }
+  const liters=+document.getElementById('rc-liters').value,price=+document.getElementById('rc-price').value||0,station=document.getElementById('rc-station').value.trim(),receipt=document.getElementById('rc-receipt').value.trim(),resp=document.getElementById('rc-resp').value.trim(),date=document.getElementById('rc-date').value||now();
   if(!liters||liters<=0){setAlert('rc-alert','Ingresá los litros.','w');return;}
   const c=S.cisternas.find(x=>x.id===cId),prev=c.current,nl=Math.min(c.capacidad,prev+liters);
   const rec={id:uid(),cisternaId:cId,cisternaName:c.nombre,liters,price,total:price*liters,station,receipt,resp,date,levelBefore:prev,levelAfter:nl};
