@@ -2041,12 +2041,13 @@ function renderAnalisis(){
   }
 
   // ── PATRONES DE TIEMPO ───────────────────────────────
+  const porDia=Array(7).fill(0);
   let patronesHtml='';
   if(pocosDatos){
     patronesHtml=`<div class="hint-box">Se necesitan al menos ${MIN_DIAS} días de registros.</div>`;
   } else {
     // Consumo por día de la semana
-    const porDia=Array(7).fill(0);
+    porDia.fill(0);
     const countDia=Array(7).fill(0);
     todasCargas.forEach(l=>{porDia[l.fecha.getDay()]+=l.liters;countDia[l.fecha.getDay()]++;});
     const maxDia=Math.max(...porDia);
