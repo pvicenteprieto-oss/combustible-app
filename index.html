@@ -2196,7 +2196,7 @@ function renderAnalisis(){
       const difKm=kmActual-kmPrev;
       const litros=+curr.liters||0;
       if(difKm>0&&difKm<50000&&litros>0&&kmPrev>0){
-        datosLpkm.push({litros, km:difKm, lpkm:litros/difKm*100, fecha:curr.date});
+        datosLpkm.push({litros, km:difKm, lpkm:difKm/litros, fecha:curr.date});
       }
     }
 
@@ -2229,9 +2229,9 @@ function renderAnalisis(){
           </div>`:''}
         ${d.lpkmProm!==null?`
           <div style="background:#f0faf5;border-radius:8px;padding:8px 12px;min-width:140px">
-            <div style="font-size:11px;color:#888;margin-bottom:3px">Consumo por km</div>
-            <div style="font-size:18px;font-weight:700;color:#3B6D11">${d.lpkmProm.toFixed(1)} <span style="font-size:12px;font-weight:400">L/100km</span></div>
-            ${d.lpkmMin!==null?`<div style="font-size:11px;color:#aaa;margin-top:2px">Rango: ${d.lpkmMin.toFixed(1)} — ${d.lpkmMax.toFixed(1)} L/100km (${d.nLpkm} registros)</div>`:`<div style="font-size:11px;color:#aaa">${d.nLpkm} registro</div>`}
+            <div style="font-size:11px;color:#888;margin-bottom:3px">Rendimiento por km</div>
+            <div style="font-size:18px;font-weight:700;color:#3B6D11">${d.lpkmProm.toFixed(1)} <span style="font-size:12px;font-weight:400">km/L</span></div>
+            ${d.lpkmMin!==null?`<div style="font-size:11px;color:#aaa;margin-top:2px">Rango: ${d.lpkmMin.toFixed(1)} — ${d.lpkmMax.toFixed(1)} km/L (${d.nLpkm} registros)</div>`:`<div style="font-size:11px;color:#aaa">${d.nLpkm} registro</div>`}
           </div>`:''}
         ${d.lphProm===null&&d.lpkmProm===null?`<div style="font-size:12px;color:#aaa;font-style:italic">Sin suficientes datos entre cargas consecutivas para calcular consumo.</div>`:''}
       </div>
