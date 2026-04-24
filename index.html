@@ -2181,7 +2181,7 @@ function renderAnalisis(){
       const tacoPrev=parseFloat(prev.tacometer)||0;
       const difHoras=tacoActual-tacoPrev;
       const litros=+curr.liters||0;
-      if(difHoras>0&&difHoras<500&&litros>0){
+      if(difHoras>0&&difHoras<2000&&litros>0&&tacoPrev>0){
         datosLph.push({litros, horas:difHoras, lph:litros/difHoras, fecha:curr.date});
       }
     }
@@ -2190,11 +2190,11 @@ function renderAnalisis(){
     const datosLpkm=[];
     for(let i=1;i<cargasEq.length;i++){
       const prev=cargasEq[i-1], curr=cargasEq[i];
-      const kmActual=parseFloat(curr.km)||0;
-      const kmPrev=parseFloat(prev.km)||0;
+      const kmActual=parseFloat(String(curr.km).replace(/[^0-9.]/g,''))||0;
+      const kmPrev=parseFloat(String(prev.km).replace(/[^0-9.]/g,''))||0;
       const difKm=kmActual-kmPrev;
       const litros=+curr.liters||0;
-      if(difKm>0&&difKm<5000&&litros>0){
+      if(difKm>0&&difKm<50000&&litros>0&&kmPrev>0){
         datosLpkm.push({litros, km:difKm, lpkm:litros/difKm*100, fecha:curr.date});
       }
     }
