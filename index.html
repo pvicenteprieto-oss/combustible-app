@@ -434,6 +434,10 @@ tr:last-child td{border-bottom:none}
             <div id="analisis-choferes"></div>
           </div>
         </div>
+        <div class="raised" style="margin-top:1rem">
+          <div class="raised-title">Consumo por equipo (L/h y L/km)</div>
+          <div id="analisis-consumo-equipo"></div>
+        </div>
       </div>
 
       <!-- CONTRATOS -->
@@ -2161,6 +2165,79 @@ function renderAnalisis(){
       }
     }
   }
+
+  // ── CONSUMO POR EQUIPO (L/h y L/km) ────────────────────
+  const consumoEquipos=S.equipos.map(eq=>{
+    // Cargas de cisterna con tacómetro o km del equipo, ordenadas por fecha
+    const cargasEq=S.cargas
+      .filter(l=>l.equipoId===eq.id)
+      .sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+    // Calcular consumo en L/h usando tacómetro entre cargas consecutivas
+    const datosLph=[];
+    for(let i=1;i<cargasEq.length;i++){
+      const prev=cargasEq[i-1], curr=cargasEq[i];
+      const tacoActual=parseFloat(curr.tacometer)||0;
+      const tacoPrev=parseFloat(prev.tacometer)||0;
+      const difHoras=tacoActual-tacoPrev;
+      const litros=+curr.liters||0;
+      if(difHoras>0&&difHoras<500&&litros>0){
+        datosLph.push({litros, horas:difHoras, lph:litros/difHoras, fecha:curr.date});
+      }
+    }
+
+    // Calcular consumo en L/km usando km entre cargas consecutivas
+    const datosLpkm=[];
+    for(let i=1;i<cargasEq.length;i++){
+      const prev=cargasEq[i-1], curr=cargasEq[i];
+      const kmActual=parseFloat(curr.km)||0;
+      const kmPrev=parseFloat(prev.km)||0;
+      const difKm=kmActual-kmPrev;
+      const litros=+curr.liters||0;
+      if(difKm>0&&difKm<5000&&litros>0){
+        datosLpkm.push({litros, km:difKm, lpkm:litros/difKm*100, fecha:curr.date});
+      }
+    }
+
+    // Promedios
+    const lphProm=datosLph.length>0?datosLph.reduce((a,b)=>a+b.lph,0)/datosLph.length:null;
+    const lpkmProm=datosLpkm.length>0?datosLpkm.reduce((a,b)=>a+b.lpkm,0)/datosLpkm.length:null;
+    const lphMin=datosLph.length>1?Math.min(...datosLph.map(d=>d.lph)):null;
+    const lphMax=datosLph.length>1?Math.max(...datosLph.map(d=>d.lph)):null;
+    const lpkmMin=datosLpkm.length>1?Math.min(...datosLpkm.map(d=>d.lpkm)):null;
+    const lpkmMax=datosLpkm.length>1?Math.max(...datosLpkm.map(d=>d.lpkm)):null;
+
+    return{eq, lphProm, lpkmProm, lphMin, lphMax, lpkmMin, lpkmMax,
+           nLph:datosLph.length, nLpkm:datosLpkm.length,
+           totalLitros:cargasEq.reduce((a,b)=>a+(+b.liters||0),0), nCargas:cargasEq.length};
+  }).filter(d=>d.nCargas>0).sort((a,b)=>b.totalLitros-a.totalLitros);
+
+  const consumoHtml=consumoEquipos.length?consumoEquipos.map(d=>`
+    <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0f0f0">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        <b style="font-size:14px">${d.eq.plate}</b>
+        <span class="type-chip ${TCLASS(d.eq.tipo)}">${TLABEL(d.eq.tipo)}</span>
+        <span style="font-size:12px;color:#aaa">${d.nCargas} cargas — ${d.totalLitros.toFixed(0)} L total</span>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${d.lphProm!==null?`
+          <div style="background:#f0f6ff;border-radius:8px;padding:8px 12px;min-width:140px">
+            <div style="font-size:11px;color:#888;margin-bottom:3px">Consumo por hora</div>
+            <div style="font-size:18px;font-weight:700;color:#185FA5">${d.lphProm.toFixed(1)} <span style="font-size:12px;font-weight:400">L/h</span></div>
+            ${d.lphMin!==null?`<div style="font-size:11px;color:#aaa;margin-top:2px">Rango: ${d.lphMin.toFixed(1)} — ${d.lphMax.toFixed(1)} L/h (${d.nLph} registros)</div>`:`<div style="font-size:11px;color:#aaa">${d.nLph} registro</div>`}
+          </div>`:''}
+        ${d.lpkmProm!==null?`
+          <div style="background:#f0faf5;border-radius:8px;padding:8px 12px;min-width:140px">
+            <div style="font-size:11px;color:#888;margin-bottom:3px">Consumo por km</div>
+            <div style="font-size:18px;font-weight:700;color:#3B6D11">${d.lpkmProm.toFixed(1)} <span style="font-size:12px;font-weight:400">L/100km</span></div>
+            ${d.lpkmMin!==null?`<div style="font-size:11px;color:#aaa;margin-top:2px">Rango: ${d.lpkmMin.toFixed(1)} — ${d.lpkmMax.toFixed(1)} L/100km (${d.nLpkm} registros)</div>`:`<div style="font-size:11px;color:#aaa">${d.nLpkm} registro</div>`}
+          </div>`:''}
+        ${d.lphProm===null&&d.lpkmProm===null?`<div style="font-size:12px;color:#aaa;font-style:italic">Sin suficientes datos entre cargas consecutivas para calcular consumo.</div>`:''}
+      </div>
+    </div>`).join('')
+  :`<div class="msg">Sin datos de cargas para calcular consumo.</div>`;
+
+  document.getElementById('analisis-consumo-equipo').innerHTML=consumoHtml;
 
   document.getElementById('analisis-insights').innerHTML=insights.length
     ?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:1rem">${insights.map(i=>`
