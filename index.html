@@ -1193,9 +1193,7 @@ function renderCargas(){
 
   // Aplicar filtros
   const cisternaId2=document.getElementById('hf-cisterna')?.value||'';
-  // Si se filtra por cisterna específica, solo mostrar cargas de cisterna
-  const fuenteFinal = cisternaId2 ? 'Cisterna' : fuente;
-  if(fuenteFinal) all=all.filter(l=>l.fuente===fuenteFinal);
+  if(fuente) all=all.filter(l=>l.fuente===fuente);
   if(cisternaId2) all=all.filter(l=>String(l.cisternaId)===String(cisternaId2));
   if(chofer) all=all.filter(l=>l.chofer===chofer);
   if(equipoId) all=all.filter(l=>l.equipoId===equipoId);
