@@ -1265,7 +1265,7 @@ function renderEstacion(){
   if(selE)selE.innerHTML=S.equipos.map(e=>`<option value="${e.id}">${e.plate} — ${TLABEL(e.tipo)}</option>`).join('');
   const selCont=document.getElementById('en-contrato');
   if(selCont)selCont.innerHTML='<option value="">Sin contrato</option>'+S.contratos.filter(c=>c.estado==='activo').map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
-  if(!document.getElementById('en-date').value)document.getElementById('en-date').value=now();
+  document.getElementById('en-date').value=now();
   buildChoferSelector('en-driver-sel','en-driver-manual');
 }
 
@@ -1274,6 +1274,7 @@ async function registrarCargaEstacion(){
   clearCache();
   const eqId=document.getElementById('en-equipo').value,driver=getChoferValue('en-driver-sel','en-driver-manual'),liters=+document.getElementById('en-liters').value,fuel=document.getElementById('en-fuel').value,contratoId=document.getElementById('en-contrato').value,receipt=document.getElementById('en-receipt').value.trim(),price=+document.getElementById('en-price').value||0,date=document.getElementById('en-date').value||now(),obs=document.getElementById('en-obs').value.trim();
   if(!eqId||!driver||!liters||liters<=0){setAlert('en-alert','Completá equipo, operador y litros.','w');return;}
+  if(!date){setAlert('en-alert','La fecha y hora es obligatoria.','w');return;}
   const eq=S.equipos.find(e=>e.id===eqId);
   const contrato=S.contratos.find(c=>c.id===contratoId);
   const kmEst=document.getElementById('en-km')?.value.trim()||'';
