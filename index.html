@@ -1203,7 +1203,8 @@ function renderCargas(){
 
   // Ordenar por fecha desc
   all.sort((a,b)=>new Date(b.fecha||0)-new Date(a.fecha||0));
-  const limit=+document.getElementById('hf-limit')?.value||20;
+  const limitRaw=document.getElementById('hf-limit')?.value;
+  const limit=limitRaw===undefined||limitRaw===null?20:+limitRaw;
   const totalMovimientos=all.length;
   if(limit>0) all=all.slice(0,limit);
 
