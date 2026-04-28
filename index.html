@@ -1898,12 +1898,15 @@ async function guardarEditCarga(){
   const motivo=document.getElementById('edit-motivo').value.trim();
 
   if(!litrosNew||litrosNew<=0){setAlert('edit-alert','Ingresá los litros.','w');return;}
+  if(!fecha){setAlert('edit-alert','La fecha es obligatoria.','w');return;}
   if(!motivo){setAlert('edit-alert','El motivo de la modificación es obligatorio.','w');return;}
 
   const eqId=document.getElementById('edit-equipo').value;
   const chofer=getChoferValue('edit-chofer-sel','edit-chofer-manual');
   const contratoId=document.getElementById('edit-contrato').value;
-  const fecha=document.getElementById('edit-fecha').value;
+  const fechaRaw=document.getElementById('edit-fecha').value;
+  const cargaOrig=currentUser?S.cargas.find(l=>l.id===document.getElementById('edit-id').value)||S.cargas_estacion.find(l=>l.id===document.getElementById('edit-id').value):null;
+  const fecha=fechaRaw||(cargaOrig?.date||cargaOrig?.fecha||now());
   const taco=document.getElementById('edit-taco').value.trim();
   const km=document.getElementById('edit-km').value.trim();
   const obs=document.getElementById('edit-obs').value.trim();
