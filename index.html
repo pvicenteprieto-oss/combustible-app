@@ -955,7 +955,7 @@ function renderPanel(){
   const dd=S.desvios.filter(d=>(new Date()-new Date(d.date))<86400000*7).slice(-4).reverse();
   document.getElementById('panel-desvios').innerHTML=dd.length?dd.map(d=>`<div class="dev-card ${d.tipo==='alto'?'dev-dan':'dev-warn'}"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><span style="font-weight:700;font-size:13px">${d.plate} — ${d.driver}</span><span class="badge ${d.tipo==='alto'?'b-dan':'b-warn'}">${d.tipo==='alto'?'Consumo alto':'Consumo bajo'} ${d.desvPct>0?'+':''}${(+d.desvPct).toFixed(0)}%</span></div><div style="font-size:12px;color:#888;margin-top:2px">${(+d.actual).toFixed(1)} L/h vs ${(+d.esperado).toFixed(1)} esperado — ${fdt(d.date)}</div></div>`).join(''):`<div class="msg">Sin alertas recientes.</div>`;
 
-  const recent=[...S.cargas.map(l=>({...l,fuente:'Cisterna'})),...S.cargas_estacion.map(l=>({...l,fuente:'Estación'}))].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
+  const recent=[...S.cargas.map(l=>({...l,fuente:'Cisterna'})),...S.cargas_estacion.map(l=>({...l,fuente:'Estación',date:l.date||l.fecha||''}))].sort((a,b)=>new Date(b.date||0)-new Date(a.date||0)).slice(0,6);
   document.getElementById('panel-recent').innerHTML=recent.length?`<div class="tbl-wrap"><table><thead><tr><th>Equipo</th><th>Chofer</th><th>Litros</th><th>Fuente</th><th>Fecha</th></tr></thead><tbody>${recent.map(l=>{const eq=S.equipos.find(e=>e.id===l.equipoId);return`<tr><td><b>${eq?eq.plate:l.plate||'-'}</b></td><td>${l.driver}</td><td>${(+l.liters||0).toFixed(0)} L</td><td><span class="badge ${l.fuente==='Cisterna'?'b-info':'b-teal'}">${l.fuente}</span></td><td>${fdt(l.date)}</td></tr>`;}).join('')}</tbody></table></div>`:`<div class="msg">Sin cargas registradas.</div>`;
 }
 
@@ -1172,7 +1172,7 @@ function renderCargas(){
       registradoPor:l.usuario||'', detalle:`$${(+l.monto||0).toLocaleString('es-AR')} a $${(+l.precio||0).toFixed(2)}/L`
     })),
     ...S.cargas.map(l=>({
-      id:l.id, fecha:l.date, equipo:l.plate||S.equipos.find(e=>e.id===l.equipoId)?.plate||'-',
+      id:l.id, fecha:l.date||l.fecha||'1970-01-01', equipo:l.plate||S.equipos.find(e=>e.id===l.equipoId)?.plate||'-',
       equipoId:l.equipoId, chofer:l.driver, litros:+l.liters||0,
       combustible:S.cisternas.find(c=>c.id===l.cisternaId)?.combustible||'-',
       contrato:l.contratoNombre||'', contratoId:l.contratoId||'',
@@ -1181,7 +1181,7 @@ function renderCargas(){
       registradoPor:l.registradoPor||'', detalle:''
     })),
     ...S.cargas_estacion.map(l=>({
-      id:l.id, fecha:l.date, equipo:l.plate||S.equipos.find(e=>e.id===l.equipoId)?.plate||'-',
+      id:l.id, fecha:l.date||l.fecha||'1970-01-01', equipo:l.plate||S.equipos.find(e=>e.id===l.equipoId)?.plate||'-',
       equipoId:l.equipoId, chofer:l.driver, litros:+l.liters||0,
       combustible:FLABEL(l.combustible)||'-',
       contrato:l.contratoNombre||'', contratoId:l.contratoId||'',
@@ -1204,7 +1204,7 @@ function renderCargas(){
   if(hasta) all=all.filter(l=>l.fecha<=hasta+'T23:59');
 
   // Ordenar por fecha desc
-  all.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  all.sort((a,b)=>new Date(b.fecha||0)-new Date(a.fecha||0));
   const limit=+document.getElementById('hf-limit')?.value||20;
   const totalMovimientos=all.length;
   if(limit>0) all=all.slice(0,limit);
