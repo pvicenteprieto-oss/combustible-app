@@ -359,6 +359,9 @@ tr:last-child td{border-bottom:none}
           </div>
         </div>
 
+        <!-- Salvar diferencia estación -->
+        <div id="est-salvar-dif" style="display:none;margin-bottom:1rem"></div>
+
         <!-- Control remitos -->
         <div id="est-control" style="display:none">
           <div class="raised">
@@ -1260,6 +1263,21 @@ function setEstTab(t){
 }
 
 function renderEstacion(){
+  // Mostrar botón salvar diferencia si hay saldo y el rol lo permite
+  const divSalvar=document.getElementById('est-salvar-dif');
+  if(divSalvar){
+    const puedeS=currentUser.rol==='admin'||currentUser.rol==='empresa';
+    const saldo=S.estacion_saldo?.litros||0;
+    if(puedeS&&saldo>0){
+      divSalvar.style.display='block';
+      divSalvar.innerHTML=`<div class="alert al-w" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <span>Saldo actual: <b>${saldo.toFixed(0)} L</b>. Si los litros reales se agotaron, podés salvar la diferencia y poner el saldo en 0.</span>
+        <button class="btn dan" style="padding:6px 14px;font-size:13px;white-space:nowrap" onclick="salvarDiferenciaEstacion()">Salvar diferencia ↗</button>
+      </div>`;
+    } else {
+      divSalvar.style.display='none';
+    }
+  }
   const selE=document.getElementById('en-equipo');
   if(selE)selE.innerHTML=S.equipos.map(e=>`<option value="${e.id}">${e.plate} — ${TLABEL(e.tipo)}</option>`).join('');
   const selCont=document.getElementById('en-contrato');
@@ -1400,6 +1418,55 @@ async function salvarDiferencia(cisternaId){
     S.auditoria.push(audit);
     renderPanel();
     alert(`Diferencia salvada. ${c.nombre} queda en 0 L. Se registraron ${diff} L de diferencia en el historial.`);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── SALVAR DIFERENCIA ESTACIÓN ───────────────────────────
+async function salvarDiferenciaEstacion(){
+  const saldo=S.estacion_saldo?.litros||0;
+  if(saldo<=0){alert('El saldo ya está en 0.');return;}
+  const motivo=prompt(`El saldo de la estación es ${saldo.toFixed(0)} L.\nEsto lo pondrá en 0 y registrará la diferencia en el historial.\n\nIngresá el motivo (obligatorio):`);
+  if(motivo===null)return;
+  if(!motivo.trim()){alert('El motivo es obligatorio.');return;}
+
+  const ajuste={
+    id:uid(), fecha:now(),
+    tipo:'salvar_diferencia_estacion',
+    litrosAntes:saldo, litrosDespues:0,
+    diferencia:saldo,
+    motivo:motivo.trim(),
+    usuario:currentUser.nombre||currentUser.username
+  };
+
+  try{
+    await api({action:'addAjuste',data:JSON.stringify(ajuste)});
+    await api({action:'updateEstacionSaldo',value:0});
+    S.estacion_saldo={litros:0};
+
+    // Registrar en auditoría
+    const audit={id:uid(),fecha:now(),tipo:'ajuste',fuente:'Estación',
+      cargaId:ajuste.id,usuario:currentUser.nombre||currentUser.username,
+      motivo:motivo.trim(),litrosAntes:saldo,litrosDespues:0,
+      cambios:`Diferencia salvada en estación: ${saldo.toFixed(0)} L`};
+    await api({action:'addAuditoria',data:JSON.stringify(audit)});
+    S.auditoria.push(audit);
+
+    // Registrar en cargas como movimiento visible
+    const movDif={
+      id:uid(), equipoId:'', plate:'-', tipoEquipo:'-',
+      driver:'-', liters:-saldo, combustible:'Varios',
+      contratoId:'', contratoNombre:'',
+      date:now(), obs:`Diferencia de saldo salvada: ${saldo.toFixed(0)} L`,
+      receipt:'', price:0, total:0,
+      registradoPor:currentUser.nombre||currentUser.username,
+      tipo:'ajuste_diferencia_estacion'
+    };
+    await api({action:'addCargaEstacion',data:JSON.stringify(movDif)});
+    S.cargas_estacion.push(movDif);
+
+    renderEstacion();
+    renderPanel();
+    alert(`Diferencia salvada. Saldo de estación queda en 0 L. Se registraron ${saldo.toFixed(0)} L de diferencia en el historial.`);
   }catch(e){alert('Error: '+e.message);}
 }
 
