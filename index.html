@@ -348,7 +348,10 @@ tr:last-child td{border-bottom:none}
               <div class="fg"><label>Contrato</label><select id="en-contrato"><option value="">Sin contrato</option></select></div>
               <div class="fg"><label>N° remito</label><input id="en-receipt" placeholder="0000-00000000"/></div>
             </div>
-            <div class="fg"><label>Kilómetros del vehículo (opcional)</label><input id="en-km" type="number" min="0" placeholder="0"/></div>
+            <div class="row2">
+              <div class="fg"><label>Kilómetros del vehículo (opcional)</label><input id="en-km" type="number" min="0" placeholder="0"/></div>
+              <div class="fg"><label>Tacómetro / horas equipo (opcional)</label><input id="en-taco" type="number" min="0" step="0.1" placeholder="0.0"/></div>
+            </div>
             <div class="row2">
               <div class="fg"><label>Precio por litro ($)</label><input id="en-price" type="number" step="0.01" placeholder="0.00"/></div>
               <div class="fg"><label>Fecha y hora</label><input id="en-date" type="datetime-local"/></div>
@@ -1298,7 +1301,8 @@ async function registrarCargaEstacion(){
   const eq=S.equipos.find(e=>e.id===eqId);
   const contrato=S.contratos.find(c=>c.id===contratoId);
   const kmEst=document.getElementById('en-km')?.value.trim()||'';
-  const reg={id:uid(),equipoId:eqId,plate:eq.plate,tipoEquipo:eq.tipo,driver,liters,combustible:fuel,contratoId:contratoId||'',contratoNombre:contrato?contrato.nombre:'',receipt,price,total:price*liters,date,obs,km:kmEst,registradoPor:currentUser.nombre||currentUser.username};
+  const tacoEst=document.getElementById('en-taco')?.value.trim()||'';
+  const reg={id:uid(),equipoId:eqId,plate:eq.plate,tipoEquipo:eq.tipo,driver,liters,combustible:fuel,contratoId:contratoId||'',contratoNombre:contrato?contrato.nombre:'',receipt,price,total:price*liters,date,obs,km:kmEst,tacometer:tacoEst,registradoPor:currentUser.nombre||currentUser.username};
   try{
     await api({action:'addCargaEstacion',data:JSON.stringify(reg)});
     S.cargas_estacion.push(reg);
@@ -1334,7 +1338,7 @@ async function registrarCargaEstacion(){
     await api({action:'updateEstacionSaldo',value:Math.max(0,newSaldoEst)});
     S.estacion_saldo={litros:Math.max(0,newSaldoEst)};
     setAlert('en-alert','Carga en estación registrada correctamente.'+mensajeExtra,'o');
-    ['en-liters','en-receipt','en-price','en-obs','en-km'].forEach(id=>document.getElementById(id).value='');
+    ['en-liters','en-receipt','en-price','en-obs','en-km','en-taco'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('en-driver-sel').value='';
     document.getElementById('en-driver-manual').value='';
     document.getElementById('en-driver-manual').style.display='none';
@@ -1551,12 +1555,17 @@ function renderEquipos(){
   document.getElementById('equipos-list').innerHTML=lista.length?lista.map(e=>{
     const p=calcPerfil(e.id);
     // Buscar último registro de km de cisterna o estación
+    // Último km
     const cargasCist=[...S.cargas.filter(l=>l.equipoId===e.id&&l.km&&+l.km>0)];
     const cargasEst=[...S.cargas_estacion.filter(l=>l.equipoId===e.id&&l.km&&+l.km>0)];
     const todasConKm=[...cargasCist,...cargasEst].sort((a,b)=>new Date(b.date||b.fecha)-new Date(a.date||a.fecha));
     const ultimaConKm=todasConKm[0]||null;
-    const kmInfo=ultimaConKm?`<div class="ic-sub" style="margin-top:3px">📍 <b>${(+ultimaConKm.km).toLocaleString('es-AR')} km</b> — último registro: ${fdt(ultimaConKm.date||ultimaConKm.fecha)}</div>`:'';
-    return`<div class="item-card"><div class="ic-row"><div><div class="ic-title">${e.plate} <span class="type-chip ${TCLASS(e.tipo)}">${TLABEL(e.tipo)}</span></div><div class="ic-sub">${e.model||'-'}</div>${kmInfo}${p?`<div class="ic-sub">Consumo prom: ${p.median.toFixed(1)} L/h (${p.n} registros)</div>`:''}</div>${adm?`<button class="btn sec" style="padding:4px 10px;font-size:12px;color:#A32D2D" onclick="removeEquipo('${e.id}')">Quitar</button>`:''}</div></div>`;}).join(''):`<div class="msg">Sin equipos${filtro?' de ese tipo':''}.</div>`;
+    const kmInfo=ultimaConKm?`<div class="ic-sub" style="margin-top:3px">📍 <b>${(+ultimaConKm.km).toLocaleString('es-AR')} km</b> — ${fdt(ultimaConKm.date||ultimaConKm.fecha)}</div>`:'';
+    // Último tacómetro (solo cargas cisterna)
+    const cargasConTaco=S.cargas.filter(l=>l.equipoId===e.id&&l.tacometer&&+l.tacometer>0).sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const ultimaConTaco=cargasConTaco[0]||null;
+    const tacoInfo=ultimaConTaco?`<div class="ic-sub" style="margin-top:2px">⏱ <b>${(+ultimaConTaco.tacometer).toLocaleString('es-AR')} hs</b> — ${fdt(ultimaConTaco.date)}</div>`:'';
+    return`<div class="item-card"><div class="ic-row"><div><div class="ic-title">${e.plate} <span class="type-chip ${TCLASS(e.tipo)}">${TLABEL(e.tipo)}</span></div><div class="ic-sub">${e.model||'-'}</div>${kmInfo}${tacoInfo}${p?`<div class="ic-sub">Consumo prom: ${p.median.toFixed(1)} L/h (${p.n} registros)</div>`:''}</div>${adm?`<button class="btn sec" style="padding:4px 10px;font-size:12px;color:#A32D2D" onclick="removeEquipo('${e.id}')">Quitar</button>`:''}</div></div>`;}).join(''):`<div class="msg">Sin equipos${filtro?' de ese tipo':''}.</div>`;
 }
 async function addEquipo(){
   const plate=document.getElementById('eq-id').value.trim().toUpperCase(),model=document.getElementById('eq-model').value.trim(),tipo=document.getElementById('eq-type').value,quota=+document.getElementById('eq-quota').value||80,hasTacometer=document.getElementById('eq-taco').value==='1';
