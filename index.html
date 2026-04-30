@@ -1186,7 +1186,7 @@ function renderCargas(){
       combustible:S.cisternas.find(c=>c.id===l.cisternaId)?.combustible||'-',
       contrato:l.contratoNombre||'', contratoId:l.contratoId||'',
       cisternaId:l.cisternaId||'',
-      tacometro:l.tacometer||'', km:l.km||'', obs:l.obs||'', fuente:'Cisterna',
+      tacometro:String(l.tacometer||l.horasJornada||''), km:l.km||'', obs:l.obs||'', fuente:'Cisterna',
       registradoPor:l.registradoPor||'', detalle:''
     })),
     ...S.cargas_estacion.map(l=>({
@@ -1194,7 +1194,7 @@ function renderCargas(){
       equipoId:l.equipoId, chofer:l.driver, litros:+l.liters||0,
       combustible:FLABEL(l.combustible)||'-',
       contrato:l.contratoNombre||'', contratoId:l.contratoId||'',
-      tacometro:'', km:l.km||'', obs:l.obs||'', fuente:'Estación', remito:l.receipt||'',
+      tacometro:String(l.tacometer||''), km:l.km||'', obs:l.obs||'', fuente:'Estación', remito:l.receipt||'',
       registradoPor:l.registradoPor||'', detalle:l.receipt?`Remito: ${l.receipt}`:'',
       superaSaldo:l.superaSaldo||false
     }))
@@ -1959,7 +1959,7 @@ async function guardarEditCarga(){
     } else {
       const carga=S.cargas_estacion.find(l=>l.id===id);
       const updated={...carga, equipoId:eqId, plate:eq?.plate||carga.plate,
-        driver:chofer, liters:litrosNew, obs, km, receipt,
+        driver:chofer, liters:litrosNew, obs, km, tacometer:taco, receipt,
         contratoId:contratoId||'', contratoNombre:contrato?contrato.nombre:'', date:fecha,
         modificadoPor:currentUser.nombre||currentUser.username, fechaModif:now()};
       await api({action:'updateCargaEstacion', data:JSON.stringify(updated)});
