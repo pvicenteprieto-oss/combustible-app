@@ -1194,7 +1194,7 @@ function renderCargas(){
       equipoId:l.equipoId, chofer:l.driver, litros:+l.liters||0,
       combustible:FLABEL(l.combustible)||'-',
       contrato:l.contratoNombre||'', contratoId:l.contratoId||'',
-      tacometro:'', km:'', obs:l.obs||'', fuente:'Estación', remito:l.receipt||'',
+      tacometro:'', km:l.km||'', obs:l.obs||'', fuente:'Estación', remito:l.receipt||'',
       registradoPor:l.registradoPor||'', detalle:l.receipt?`Remito: ${l.receipt}`:'',
       superaSaldo:l.superaSaldo||false
     }))
