@@ -1561,8 +1561,10 @@ function renderEquipos(){
     const todasConKm=[...cargasCist,...cargasEst].sort((a,b)=>new Date(b.date||b.fecha)-new Date(a.date||a.fecha));
     const ultimaConKm=todasConKm[0]||null;
     const kmInfo=ultimaConKm?`<div class="ic-sub" style="margin-top:3px">📍 <b>${(+ultimaConKm.km).toLocaleString('es-AR')} km</b> — ${fdt(ultimaConKm.date||ultimaConKm.fecha)}</div>`:'';
-    // Último tacómetro (solo cargas cisterna)
-    const cargasConTaco=S.cargas.filter(l=>l.equipoId===e.id&&l.tacometer&&+l.tacometer>0).sort((a,b)=>new Date(b.date)-new Date(a.date));
+    // Último tacómetro (cisterna y estación)
+    const cargasConTacoCist=S.cargas.filter(l=>l.equipoId===e.id&&l.tacometer&&+l.tacometer>0);
+    const cargasConTacoEst=S.cargas_estacion.filter(l=>l.equipoId===e.id&&l.tacometer&&+l.tacometer>0);
+    const cargasConTaco=[...cargasConTacoCist,...cargasConTacoEst].sort((a,b)=>new Date(b.date||b.fecha)-new Date(a.date||a.fecha));
     const ultimaConTaco=cargasConTaco[0]||null;
     const tacoInfo=ultimaConTaco?`<div class="ic-sub" style="margin-top:2px">⏱ <b>${(+ultimaConTaco.tacometer).toLocaleString('es-AR')} hs</b> — ${fdt(ultimaConTaco.date)}</div>`:'';
     return`<div class="item-card"><div class="ic-row"><div><div class="ic-title">${e.plate} <span class="type-chip ${TCLASS(e.tipo)}">${TLABEL(e.tipo)}</span></div><div class="ic-sub">${e.model||'-'}</div>${kmInfo}${tacoInfo}${p?`<div class="ic-sub">Consumo prom: ${p.median.toFixed(1)} L/h (${p.n} registros)</div>`:''}</div>${adm?`<button class="btn sec" style="padding:4px 10px;font-size:12px;color:#A32D2D" onclick="removeEquipo('${e.id}')">Quitar</button>`:''}</div></div>`;}).join(''):`<div class="msg">Sin equipos${filtro?' de ese tipo':''}.</div>`;
