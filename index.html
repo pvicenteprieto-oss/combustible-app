@@ -1757,7 +1757,7 @@ async function addEquipo(){
   const plate=document.getElementById('eq-id').value.trim().toUpperCase(),model=document.getElementById('eq-model').value.trim(),tipo=document.getElementById('eq-type').value,quota=+document.getElementById('eq-quota').value||80,hasTacometer=document.getElementById('eq-taco').value==='1',eqContratoId=document.getElementById('eq-contrato')?.value||'',eqContrato=S.contratos.find(c=>c.id===eqContratoId);
   if(!plate||!model){alert('Completá identificador y descripción.');return;}
   if(S.equipos.find(e=>e.plate===plate)){alert('Ya existe un equipo con ese identificador.');return;}
-  const eq={id:uid(),plate,model,tipo,quota,hasTacometer,driver};
+  const eq={id:uid(),plate,model,tipo,quota,hasTacometer,manualLph:'',contratoId:eqContratoId||'',contratoNombre:eqContrato?eqContrato.nombre:''};
   try{await api({action:'addEquipo',data:JSON.stringify(eq)});S.equipos.push(eq);closeModal('modal-add-equipo');renderEquipos();}
   catch(e){alert('Error: '+e.message);}
 }
