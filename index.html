@@ -586,6 +586,7 @@ tr:last-child td{border-bottom:none}
         <option value="operador">Operador de maquinaria</option>
         <option value="ambos">Chofer y operador</option>
       </select></div>
+    <div class="fg"><label>Vencimiento licencia de conducir (opcional)</label><input id="ch-licencia" type="date"/></div>
     <div id="ch-alert"></div>
     <div class="btn-row">
       <button class="btn sec" onclick="closeModal('modal-add-chofer')">Cancelar</button>
@@ -1087,16 +1088,26 @@ function renderChoferes(){
   const adm=currentUser.rol==='admin';
   document.getElementById('btn-add-chofer').style.display=adm?'':'none';
   const chofOrd=[...S.choferes].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
-  document.getElementById('choferes-list').innerHTML=chofOrd.length?chofOrd.map(c=>`
-    <div class="item-card">
+  document.getElementById('choferes-list').innerHTML=chofOrd.length?chofOrd.map(c=>{
+    const lic=docEstadoLicencia(c.licencia||'');
+    return`<div class="item-card">
       <div class="ic-row">
-        <div>
+        <div style="flex:1">
           <div class="ic-title">${c.nombre}${c.legajo?' <span style="font-size:12px;color:#888;font-weight:400">Leg. ${c.legajo}</span>':''}</div>
           <div class="ic-sub">${{chofer:'Chofer',operador:'Operador de maquinaria',ambos:'Chofer y operador'}[c.tipo]||c.tipo}</div>
+          <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:12px;color:#666;font-weight:600">Licencia:</span>
+            <span class="badge ${lic.cls}">${lic.txt}</span>
+            ${c.licencia?`<span style="font-size:11px;color:#aaa">vence ${c.licencia}</span>`:'<span style="font-size:11px;color:#aaa">Sin fecha cargada</span>'}
+          </div>
         </div>
-        ${adm?`<button class="btn sec" style="padding:4px 10px;font-size:12px;color:#A32D2D" onclick="removeChofer('${c.id}')">Quitar</button>`:''}
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <button class="btn sec" style="padding:4px 10px;font-size:12px" onclick="editarLicencia('${c.id}')">Licencia</button>
+          ${adm?`<button class="btn sec" style="padding:4px 10px;font-size:12px;color:#A32D2D" onclick="removeChofer('${c.id}')">Quitar</button>`:''}
+        </div>
       </div>
-    </div>`).join(''):`<div class="msg">Sin choferes registrados.</div>`;
+    </div>`;
+  }).join(''):`<div class="msg">Sin choferes registrados.</div>`;
 }
 async function addChofer(){
   const nombre=document.getElementById('ch-nombre').value.trim();
@@ -1104,13 +1115,14 @@ async function addChofer(){
   const tipo=document.getElementById('ch-tipo').value;
   if(!nombre){setAlert('ch-alert','Ingresá el nombre completo.','w');return;}
   if(S.choferes.find(c=>c.nombre.toLowerCase()===nombre.toLowerCase())){setAlert('ch-alert','Ya existe un chofer con ese nombre.','d');return;}
-  const ch={id:uid(),nombre,legajo,tipo,activo:'true'};
+  const licencia=document.getElementById('ch-licencia').value||'';
+  const ch={id:uid(),nombre,legajo,tipo,licencia,activo:'true'};
   try{
     await api({action:'addChofer',data:JSON.stringify(ch)});
     S.choferes.push(ch);closeModal('modal-add-chofer');renderChoferes();
     buildChoferSelector('cc-driver-sel','cc-driver-manual');
     buildChoferSelector('en-driver-sel','en-driver-manual');
-    ['ch-nombre','ch-legajo'].forEach(id=>document.getElementById(id).value='');
+    ['ch-nombre','ch-legajo','ch-licencia'].forEach(id=>document.getElementById(id).value='');
   }catch(e){setAlert('ch-alert','Error: '+e.message,'d');}
 }
 async function removeChofer(id){
@@ -2070,6 +2082,30 @@ async function eliminarCarga(id, fuente){
   }catch(e){alert('Error: '+e.message);}
 }
 
+// ── LICENCIAS DE CHOFERES ────────────────────────────────
+function docEstadoLicencia(fechaVence){
+  if(!fechaVence) return {cls:'b-gray',txt:'Sin fecha'};
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const vence=new Date(fechaVence+'T00:00:00');
+  const dias=Math.round((vence-hoy)/86400000);
+  if(dias<0) return {cls:'b-dan',txt:`Vencida hace ${Math.abs(dias)} días`};
+  if(dias<=30) return {cls:'b-warn',txt:`Vence en ${dias} día${dias===1?'':'s'}`};
+  return {cls:'b-ok',txt:'Vigente'};
+}
+
+function editarLicencia(choferId){
+  const ch=S.choferes.find(c=>c.id===choferId);
+  if(!ch)return;
+  const nueva=prompt(`Vencimiento de licencia de ${ch.nombre}\nFormato: AAAA-MM-DD\nActual: ${ch.licencia||'Sin fecha'}\n\nIngresá la nueva fecha:`);
+  if(nueva===null)return;
+  const re=/^\d{4}-\d{2}-\d{2}$/;
+  if(nueva!==''&&!re.test(nueva)){alert('Formato incorrecto. Usá AAAA-MM-DD (ej: 2026-12-31)');return;}
+  ch.licencia=nueva;
+  api({action:'updateChofer',data:JSON.stringify(ch)}).then(()=>{
+    renderChoferes();
+  }).catch(e=>alert('Error: '+e.message));
+}
+
 // ── DOCUMENTACIÓN ───────────────────────────────────────
 function getDocEquipo(equipoId){
   return S.documentacion.find(d=>d.equipoId===equipoId)||null;
@@ -2114,10 +2150,23 @@ function renderDocumentacion(){
     const doc=getDocEquipo(eq.id);
     const vtv=docEstado(doc?.vtvVence||null);
     const ypf=docEstado(doc?.ypfVence||null);
+    // Estado general del equipo
+    let estadoGeneral,clsGeneral;
+    if(!doc||(!doc.vtvVence&&!doc.ypfVence)){estadoGeneral='Sin documentación';clsGeneral='b-gray';}
+    else{
+      const vtvOk=doc.vtvVence&&docEstado(doc.vtvVence).dias!==null&&docEstado(doc.vtvVence).dias>15;
+      const ypfOk=doc.ypfVence&&docEstado(doc.ypfVence).dias!==null&&docEstado(doc.ypfVence).dias>15;
+      const vtvVenc=doc.vtvVence&&docEstado(doc.vtvVence).dias!==null&&docEstado(doc.vtvVence).dias<0;
+      const ypfVenc=doc.ypfVence&&docEstado(doc.ypfVence).dias!==null&&docEstado(doc.ypfVence).dias<0;
+      if(vtvVenc&&ypfVenc){estadoGeneral='Ambas vencidas';clsGeneral='b-dan';}
+      else if(vtvVenc||ypfVenc||docEstado(doc.vtvVence).dias<=15||docEstado(doc.ypfVence).dias<=15){estadoGeneral='Requiere atención';clsGeneral='b-warn';}
+      else if(vtvOk&&ypfOk){estadoGeneral='Todo vigente';clsGeneral='b-ok';}
+      else{estadoGeneral='Incompleto';clsGeneral='b-warn';}
+    }
     return`<div class="item-card">
       <div class="ic-row">
         <div style="flex:1">
-          <div class="ic-title">${eq.plate} <span class="type-chip ${TCLASS(eq.tipo)}">${TLABEL(eq.tipo)}</span></div>
+          <div class="ic-title">${eq.plate} <span class="type-chip ${TCLASS(eq.tipo)}">${TLABEL(eq.tipo)}</span> <span class="badge ${clsGeneral}">${estadoGeneral}</span></div>
           <div class="ic-sub">${eq.model||''}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
             <div style="font-size:12px">
