@@ -836,9 +836,10 @@ let S={config:{lowAlertPct:15,tolerance:25,minRecords:3,estacion:''},choferes:[]
 function getDeviceId(){let id=localStorage.getItem('dvc');if(!id){id='d'+Date.now().toString(36);localStorage.setItem('dvc',id);}return id;}
 function getDevice(){const ua=navigator.userAgent;if(/android/i.test(ua))return'Android';if(/iphone|ipad/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/mac/i.test(ua))return'Mac';return'Otro';}
 
+const API_TOKEN='eb8f2d9a2fc2087e91522f177510da771e8d36449ee582cb1d6d6602e8b3a870';
 async function api(params){
   const dot=document.getElementById('sync-dot');if(dot)dot.className='sync-dot loading';
-  try{const r=await fetch(API+'?'+new URLSearchParams(params));const j=await r.json();if(j.error)throw new Error(j.error);if(dot)dot.className='sync-dot ok';return j;}
+  try{const r=await fetch(API+'?'+new URLSearchParams({...params,token:API_TOKEN}));const j=await r.json();if(j.error)throw new Error(j.error);if(dot)dot.className='sync-dot ok';return j;}
   catch(e){if(dot)dot.className='sync-dot err';throw e;}
 }
 
