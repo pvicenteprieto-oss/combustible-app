@@ -550,6 +550,8 @@ tr:last-child td{border-bottom:none}
     <div class="row2">
       <div class="fg"><label>¿Tiene tacómetro?</label>
         <select id="eq-taco"><option value="1">Sí</option><option value="0">No</option></select></div>
+      <div class="fg"><label>Contrato asignado (opcional)</label>
+        <select id="eq-contrato"><option value="">Sin contrato</option></select></div>
     </div>
     <div class="btn-row">
       <button class="btn sec" onclick="closeModal('modal-add-equipo')">Cancelar</button>
@@ -574,6 +576,38 @@ tr:last-child td{border-bottom:none}
     <div class="btn-row">
       <button class="btn sec" onclick="closeModal('modal-edit-contrato')">Cancelar</button>
       <button class="btn pri" onclick="guardarEditContrato()">Guardar ↗</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="modal-edit-equipo">
+  <div class="modal">
+    <div class="modal-title">Editar equipo <button class="modal-close" onclick="closeModal('modal-edit-equipo')">✕</button></div>
+    <input type="hidden" id="edit-eq-id"/>
+    <div class="fg"><label>Identificador</label><input id="edit-eq-plate" placeholder="Ej: AB123CD"/></div>
+    <div class="fg"><label>Descripción / modelo</label><input id="edit-eq-model" placeholder="Ej: John Deere 5075E"/></div>
+    <div class="row2">
+      <div class="fg"><label>Tipo</label>
+        <select id="edit-eq-tipo">
+          <option value="camion">Camión</option>
+          <option value="camioneta">Camioneta</option>
+          <option value="tractor">Tractor</option>
+          <option value="retro">Retroexcavadora</option>
+          <option value="calister">Calister</option>
+          <option value="otro">Otro</option>
+        </select></div>
+      <div class="fg"><label>Cuota diaria (L)</label><input id="edit-eq-quota" type="number" value="80"/></div>
+    </div>
+    <div class="row2">
+      <div class="fg"><label>¿Tiene tacómetro?</label>
+        <select id="edit-eq-taco"><option value="1">Sí</option><option value="0">No</option></select></div>
+      <div class="fg"><label>Contrato asignado (opcional)</label>
+        <select id="edit-eq-contrato"><option value="">Sin contrato</option></select></div>
+    </div>
+    <div id="edit-eq-alert"></div>
+    <div class="btn-row">
+      <button class="btn sec" onclick="closeModal('modal-edit-equipo')">Cancelar</button>
+      <button class="btn pri" onclick="guardarEditEquipo()">Guardar ↗</button>
     </div>
   </div>
 </div>
@@ -890,7 +924,10 @@ function show(id){
   currentSection=id;renderSection(id);
 }
 function renderSection(id){switch(id){case 'panel':renderPanel();break;case 'carga':renderFormCarga();break;case 'estacion':renderEstacion();break;case 'cargas':renderCargas();break;case 'equipos':renderEquipos();break;case 'contratos':renderContratos();break;case 'analisis':renderAnalisis();break;case 'documentacion':renderDocumentacion();break;case 'choferes':renderChoferes();break;case 'usuarios':renderUsuarios();break;case 'sesiones':renderSesiones();break;case 'config':renderConfig();break;}}
-function showModal(id){document.getElementById(id).classList.add('open')}
+function showModal(id){
+  document.getElementById(id).classList.add('open');
+  if(id==='modal-add-equipo') poblarSelectorContratosEquipo('eq-contrato');
+}
 function closeModal(id){document.getElementById(id).classList.remove('open')}
 function setAlert(id,msg,type='o'){const el=document.getElementById(id);if(el)el.innerHTML=msg?`<div class="alert al-${type}">${msg}</div>`:'';}
 function clearAfter(id,ms=3000){setTimeout(()=>setAlert(id,''),ms)}
@@ -1644,6 +1681,13 @@ async function recargarCisterna(){
 }
 
 // ── EQUIPOS ──────────────────────────────────────────────
+function poblarSelectorContratosEquipo(selId, valorActual=''){
+  const sel=document.getElementById(selId);
+  if(!sel)return;
+  sel.innerHTML='<option value="">Sin contrato</option>'+S.contratos.filter(c=>c.estado==='activo').map(c=>`<option value="${c.id}" ${c.id===valorActual?'selected':''}>${c.nombre}${c.numero?' ('+c.numero+')':''}</option>`).join('');
+  if(valorActual)sel.value=valorActual;
+}
+
 function renderEquipos(){
   const filtro=document.getElementById('eq-filter')?.value||'';
   const adm=currentUser.rol==='admin';
@@ -1664,10 +1708,43 @@ function renderEquipos(){
     const cargasConTaco=[...cargasConTacoCist,...cargasConTacoEst].sort((a,b)=>new Date(b.date||b.fecha)-new Date(a.date||a.fecha));
     const ultimaConTaco=cargasConTaco[0]||null;
     const tacoInfo=ultimaConTaco?`<div class="ic-sub" style="margin-top:2px">⏱ <b>${(+ultimaConTaco.tacometer).toLocaleString('es-AR')} hs</b> — ${fdt(ultimaConTaco.date)}</div>`:'';
-    return`<div class="item-card"><div class="ic-row"><div><div class="ic-title">${e.plate} <span class="type-chip ${TCLASS(e.tipo)}">${TLABEL(e.tipo)}</span></div><div class="ic-sub">${e.model||'-'}</div>${kmInfo}${tacoInfo}${p?`<div class="ic-sub">Consumo prom: ${p.median.toFixed(1)} L/h (${p.n} registros)</div>`:''}</div>${adm?`<button class="btn sec" style="padding:4px 10px;font-size:12px;color:#A32D2D" onclick="removeEquipo('${e.id}')">Quitar</button>`:''}</div></div>`;}).join(''):`<div class="msg">Sin equipos${filtro?' de ese tipo':''}.</div>`;
+    return`<div class="item-card"><div class="ic-row"><div><div class="ic-title">${e.plate} <span class="type-chip ${TCLASS(e.tipo)}">${TLABEL(e.tipo)}</span></div><div class="ic-sub">${e.model||'-'}</div>${kmInfo}${tacoInfo}${p?`<div class="ic-sub">Consumo prom: ${p.median.toFixed(1)} L/h (${p.n} registros)</div>`:''}</div>${adm?`<div style="display:flex;flex-direction:column;gap:6px"><button class="btn sec" style="padding:4px 10px;font-size:12px" onclick="abrirEditEquipo('${e.id}')">Editar</button><button class="btn sec" style="padding:4px 10px;font-size:12px;color:#A32D2D" onclick="removeEquipo('${e.id}')">Quitar</button></div>`:''}</div></div>`;}).join(''):`<div class="msg">Sin equipos${filtro?' de ese tipo':''}.</div>`;
 }
+function abrirEditEquipo(id){
+  const e=S.equipos.find(x=>x.id===id);
+  if(!e)return;
+  document.getElementById('edit-eq-id').value=id;
+  document.getElementById('edit-eq-plate').value=e.plate||'';
+  document.getElementById('edit-eq-model').value=e.model||'';
+  document.getElementById('edit-eq-tipo').value=e.tipo||'camion';
+  document.getElementById('edit-eq-quota').value=e.quota||80;
+  document.getElementById('edit-eq-taco').value=e.hasTacometer?'1':'0';
+  poblarSelectorContratosEquipo('edit-eq-contrato',e.contratoId||'');
+  setAlert('edit-eq-alert','');
+  showModal('modal-edit-equipo');
+}
+async function guardarEditEquipo(){
+  const id=document.getElementById('edit-eq-id').value;
+  const plate=document.getElementById('edit-eq-plate').value.trim().toUpperCase();
+  const model=document.getElementById('edit-eq-model').value.trim();
+  const tipo=document.getElementById('edit-eq-tipo').value;
+  const quota=+document.getElementById('edit-eq-quota').value||80;
+  const hasTacometer=document.getElementById('edit-eq-taco').value==='1';
+  const contratoId=document.getElementById('edit-eq-contrato').value||'';
+  const contrato=S.contratos.find(c=>c.id===contratoId);
+  if(!plate||!model){setAlert('edit-eq-alert','Completá identificador y descripción.','w');return;}
+  const eq=S.equipos.find(x=>x.id===id);
+  const updated={...eq,plate,model,tipo,quota,hasTacometer,contratoId,contratoNombre:contrato?contrato.nombre:''};
+  try{
+    await api({action:'updateEquipo',data:JSON.stringify(updated)});
+    Object.assign(eq,updated);
+    closeModal('modal-edit-equipo');
+    renderEquipos();
+  }catch(e){setAlert('edit-eq-alert','Error: '+e.message,'d');}
+}
+
 async function addEquipo(){
-  const plate=document.getElementById('eq-id').value.trim().toUpperCase(),model=document.getElementById('eq-model').value.trim(),tipo=document.getElementById('eq-type').value,quota=+document.getElementById('eq-quota').value||80,hasTacometer=document.getElementById('eq-taco').value==='1';
+  const plate=document.getElementById('eq-id').value.trim().toUpperCase(),model=document.getElementById('eq-model').value.trim(),tipo=document.getElementById('eq-type').value,quota=+document.getElementById('eq-quota').value||80,hasTacometer=document.getElementById('eq-taco').value==='1',eqContratoId=document.getElementById('eq-contrato')?.value||'',eqContrato=S.contratos.find(c=>c.id===eqContratoId);
   if(!plate||!model){alert('Completá identificador y descripción.');return;}
   if(S.equipos.find(e=>e.plate===plate)){alert('Ya existe un equipo con ese identificador.');return;}
   const eq={id:uid(),plate,model,tipo,quota,hasTacometer,driver};
