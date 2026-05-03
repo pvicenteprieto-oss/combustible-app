@@ -558,10 +558,34 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<div class="overlay" id="modal-edit-contrato">
+  <div class="modal">
+    <div class="modal-title">Editar contrato <button class="modal-close" onclick="closeModal('modal-edit-contrato')">✕</button></div>
+    <input type="hidden" id="edit-cont-id"/>
+    <div class="fg"><label>Nombre del contrato</label><input id="edit-cont-nombre" placeholder="Ej: Contrato YPF Lote 12"/></div>
+    <div class="row2">
+      <div class="fg"><label>Número de contrato (opcional)</label><input id="edit-cont-numero" placeholder="Ej: 2024-0123"/></div>
+      <div class="fg"><label>Fecha de vencimiento (opcional)</label><input id="edit-cont-vence" type="date"/></div>
+    </div>
+    <div class="fg"><label>Descripción (opcional)</label><input id="edit-cont-desc" placeholder="Descripción breve"/></div>
+    <div class="fg"><label>Estado</label>
+      <select id="edit-cont-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select></div>
+    <div id="edit-cont-alert"></div>
+    <div class="btn-row">
+      <button class="btn sec" onclick="closeModal('modal-edit-contrato')">Cancelar</button>
+      <button class="btn pri" onclick="guardarEditContrato()">Guardar ↗</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="modal-add-contrato">
   <div class="modal">
     <div class="modal-title">Agregar contrato <button class="modal-close" onclick="closeModal('modal-add-contrato')">✕</button></div>
     <div class="fg"><label>Nombre del contrato</label><input id="cont-nombre" placeholder="Ej: Contrato YPF Lote 12"/></div>
+    <div class="row2">
+      <div class="fg"><label>Número de contrato (opcional)</label><input id="cont-numero" placeholder="Ej: 2024-0123"/></div>
+      <div class="fg"><label>Fecha de vencimiento (opcional)</label><input id="cont-vence" type="date"/></div>
+    </div>
     <div class="fg"><label>Descripción (opcional)</label><input id="cont-desc" placeholder="Descripción breve"/></div>
     <div class="fg"><label>Estado</label>
       <select id="cont-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select></div>
@@ -1660,14 +1684,60 @@ async function removeEquipo(id){
 function renderContratos(){
   const adm=currentUser.rol==='admin';
   document.getElementById('btn-add-contrato').style.display=adm?'':'none';
-  document.getElementById('contratos-list').innerHTML=S.contratos.length?S.contratos.map(c=>`<div class="item-card"><div class="ic-row"><div><div class="ic-title">${c.nombre}</div><div class="ic-sub">${c.descripcion||''}</div></div><div style="display:flex;gap:8px;align-items:center"><span class="badge ${c.estado==='activo'?'b-ok':'b-gray'}">${c.estado}</span>${adm?`<button class="btn sec" style="padding:4px 10px;font-size:12px;color:#A32D2D" onclick="removeContrato('${c.id}')">Quitar</button>`:''}</div></div></div>`).join(''):`<div class="msg">Sin contratos registrados.</div>`;
+  document.getElementById('contratos-list').innerHTML=S.contratos.length?S.contratos.map(c=>{
+    const venceEst=c.vence?docEstado(c.vence):null;
+    return`<div class="item-card">
+      <div class="ic-row">
+        <div style="flex:1">
+          <div class="ic-title">${c.nombre} <span class="badge ${c.estado==='activo'?'b-ok':'b-gray'}">${c.estado}</span></div>
+          ${c.numero?`<div class="ic-sub">N°: ${c.numero}</div>`:''}
+          ${c.descripcion?`<div class="ic-sub">${c.descripcion}</div>`:''}
+          ${c.vence?`<div class="ic-sub" style="margin-top:4px">Vence: ${c.vence} <span class="badge ${venceEst.cls}" style="margin-left:4px">${venceEst.txt}</span></div>`:''}
+        </div>
+        <div style="display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap">
+          <button class="btn sec" style="padding:4px 10px;font-size:12px" onclick="abrirEditContrato('${c.id}')">Editar</button>
+          ${adm?`<button class="btn sec" style="padding:4px 10px;font-size:12px;color:#A32D2D" onclick="removeContrato('${c.id}')">Quitar</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join(''):`<div class="msg">Sin contratos registrados.</div>`;
 }
+function abrirEditContrato(id){
+  const c=S.contratos.find(x=>x.id===id);
+  if(!c)return;
+  document.getElementById('edit-cont-id').value=id;
+  document.getElementById('edit-cont-nombre').value=c.nombre||'';
+  document.getElementById('edit-cont-numero').value=c.numero||'';
+  document.getElementById('edit-cont-vence').value=c.vence||'';
+  document.getElementById('edit-cont-desc').value=c.descripcion||'';
+  document.getElementById('edit-cont-estado').value=c.estado||'activo';
+  setAlert('edit-cont-alert','');
+  showModal('modal-edit-contrato');
+}
+async function guardarEditContrato(){
+  const id=document.getElementById('edit-cont-id').value;
+  const nombre=document.getElementById('edit-cont-nombre').value.trim();
+  const numero=document.getElementById('edit-cont-numero').value.trim();
+  const vence=document.getElementById('edit-cont-vence').value||'';
+  const desc=document.getElementById('edit-cont-desc').value.trim();
+  const estado=document.getElementById('edit-cont-estado').value;
+  if(!nombre){setAlert('edit-cont-alert','El nombre es obligatorio.','w');return;}
+  const c=S.contratos.find(x=>x.id===id);
+  const updated={...c,nombre,numero,descripcion:desc,estado,vence};
+  try{
+    await api({action:'updateContrato',data:JSON.stringify(updated)});
+    Object.assign(c,updated);
+    closeModal('modal-edit-contrato');
+    renderContratos();
+  }catch(e){setAlert('edit-cont-alert','Error: '+e.message,'d');}
+}
+
 async function addContrato(){
-  const nombre=document.getElementById('cont-nombre').value.trim(),desc=document.getElementById('cont-desc').value.trim(),estado=document.getElementById('cont-estado').value;
+  const nombre=document.getElementById('cont-nombre').value.trim(),desc=document.getElementById('cont-desc').value.trim(),estado=document.getElementById('cont-estado').value,numero=document.getElementById('cont-numero').value.trim(),vence=document.getElementById('cont-vence').value||'';
   if(!nombre){setAlert('cont-alert','Ingresá el nombre del contrato.','w');return;}
   if(S.contratos.find(c=>c.nombre.toLowerCase()===nombre.toLowerCase())){setAlert('cont-alert','Ya existe un contrato con ese nombre.','d');return;}
-  const cont={id:uid(),nombre,descripcion:desc,estado};
-  try{await api({action:'addContrato',data:JSON.stringify(cont)});S.contratos.push(cont);closeModal('modal-add-contrato');renderContratos();}
+  const cont={id:uid(),nombre,numero,descripcion:desc,estado,vence};
+  try{await api({action:'addContrato',data:JSON.stringify(cont)});S.contratos.push(cont);closeModal('modal-add-contrato');['cont-nombre','cont-numero','cont-desc','cont-vence'].forEach(id=>document.getElementById(id).value='');renderContratos();}
   catch(e){setAlert('cont-alert','Error: '+e.message,'d');}
 }
 async function removeContrato(id){
