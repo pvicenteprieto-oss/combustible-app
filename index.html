@@ -666,6 +666,21 @@ tr:last-child td{border-bottom:none}
     </div>
   </div>
 </div>
+<!-- MODAL LICENCIA CHOFER -->
+<div class="overlay" id="modal-licencia">
+  <div class="modal">
+    <div class="modal-title">Vencimiento de licencia <button class="modal-close" onclick="closeModal('modal-licencia')">✕</button></div>
+    <input type="hidden" id="lic-chofer-id"/>
+    <div class="hint-box" style="margin-bottom:12px">Chofer: <b id="lic-chofer-nombre"></b></div>
+    <div class="fg"><label>Fecha de vencimiento</label><input id="lic-fecha" type="date"/></div>
+    <div id="lic-alert"></div>
+    <div class="btn-row">
+      <button class="btn sec" onclick="closeModal('modal-licencia')">Cancelar</button>
+      <button class="btn pri" onclick="guardarLicencia()">Guardar ↗</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL DOCUMENTACIÓN -->
 <div class="overlay" id="modal-doc">
   <div class="modal">
@@ -2096,14 +2111,23 @@ function docEstadoLicencia(fechaVence){
 function editarLicencia(choferId){
   const ch=S.choferes.find(c=>c.id===choferId);
   if(!ch)return;
-  const nueva=prompt(`Vencimiento de licencia de ${ch.nombre}\nFormato: AAAA-MM-DD\nActual: ${ch.licencia||'Sin fecha'}\n\nIngresá la nueva fecha:`);
-  if(nueva===null)return;
-  const re=/^\d{4}-\d{2}-\d{2}$/;
-  if(nueva!==''&&!re.test(nueva)){alert('Formato incorrecto. Usá AAAA-MM-DD (ej: 2026-12-31)');return;}
-  ch.licencia=nueva;
-  api({action:'updateChofer',data:JSON.stringify(ch)}).then(()=>{
+  document.getElementById('lic-chofer-id').value=choferId;
+  document.getElementById('lic-chofer-nombre').textContent=ch.nombre;
+  document.getElementById('lic-fecha').value=ch.licencia||'';
+  setAlert('lic-alert','');
+  showModal('modal-licencia');
+}
+async function guardarLicencia(){
+  const choferId=document.getElementById('lic-chofer-id').value;
+  const fecha=document.getElementById('lic-fecha').value;
+  const ch=S.choferes.find(c=>c.id===choferId);
+  if(!ch)return;
+  ch.licencia=fecha;
+  try{
+    await api({action:'updateChofer',data:JSON.stringify(ch)});
+    closeModal('modal-licencia');
     renderChoferes();
-  }).catch(e=>alert('Error: '+e.message));
+  }catch(e){setAlert('lic-alert','Error: '+e.message,'d');}
 }
 
 // ── DOCUMENTACIÓN ───────────────────────────────────────
