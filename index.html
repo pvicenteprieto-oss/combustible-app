@@ -244,7 +244,7 @@ tr:last-child td{border-bottom:none}
       <!-- REGISTRAR CARGA -->
       <div id="sec-carga" class="section">
         <div class="raised">
-          <div class="raised-title">Registrar carga</div>
+          <div class="raised-title">Registrar carga desde cisterna</div>
           <div class="hint-box">Completá tacómetro o kilómetros — al menos uno es obligatorio.</div>
           <div class="row2">
             <div class="fg"><label>Cisterna</label><select id="cc-cisterna"></select></div>
@@ -281,17 +281,17 @@ tr:last-child td{border-bottom:none}
           <div class="raised-title">Registro de cargas</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-end">
             <div class="fg" style="flex:1;min-width:130px;margin:0"><label>Chofer / operador</label>
-              <select id="hf-chofer"><option value="">Todos</option></select></div>
+              <select id="hf-chofer" onchange="renderCargas()"><option value="">Todos</option></select></div>
             <div class="fg" style="flex:1;min-width:130px;margin:0"><label>Equipo / interno</label>
-              <select id="hf-equipo"><option value="">Todos</option></select></div>
+              <select id="hf-equipo" onchange="renderCargas()"><option value="">Todos</option></select></div>
             <div class="fg" style="flex:1;min-width:130px;margin:0"><label>Contrato</label>
-              <select id="hf-contrato"><option value="">Todos</option></select></div>
+              <select id="hf-contrato" onchange="renderCargas()"><option value="">Todos</option></select></div>
             <div class="fg" style="min-width:110px;margin:0"><label>Desde</label>
-              <input id="hf-desde" type="date"/></div>
+              <input id="hf-desde" type="date" onchange="renderCargas()"/></div>
             <div class="fg" style="min-width:110px;margin:0"><label>Hasta</label>
-              <input id="hf-hasta" type="date"/></div>
+              <input id="hf-hasta" type="date" onchange="renderCargas()"/></div>
             <div class="fg" style="min-width:100px;margin:0"><label>Tipo</label>
-              <select id="hf-fuente">
+              <select id="hf-fuente" onchange="renderCargas()">
                 <option value="">Todos</option>
                 <option value="Cisterna">Carga cisterna</option>
                 <option value="Estación">Carga estación</option>
@@ -299,15 +299,15 @@ tr:last-child td{border-bottom:none}
                 <option value="Depósito estación">Depósito estación</option>
               </select></div>
             <div class="fg" style="flex:1;min-width:130px;margin:0"><label>Cisterna</label>
-              <select id="hf-cisterna"><option value="">Todas</option></select></div>
+              <select id="hf-cisterna" onchange="renderCargas()"><option value="">Todas</option></select></div>
             <div class="fg" style="min-width:90px;margin:0"><label>Mostrar</label>
-              <select id="hf-limit">
+              <select id="hf-limit" onchange="renderCargas()">
                 <option value="20">20</option>
                 <option value="50">50</option>
                 <option value="100">100</option>
                 <option value="0">Todas</option>
               </select></div>
-            <button class="btn sec" onclick="renderCargas()">Filtrar</button>
+            <button class="btn sec" onclick="limpiarFiltrosCargas()">Limpiar filtros</button>
           </div>
           <div id="cargas-table"></div>
           <div id="cargas-totals" style="margin-top:12px"></div>
@@ -874,7 +874,7 @@ function logout(){currentUser=null;pinBuf='';updatePinDots();document.getElement
 const ROL_LABEL={encargado:'Encargado de combustible',empresa:'Empresa',admin:'Administrador'};
 const NAV_ITEMS=[
   {id:'panel',    label:'Panel',     icon:'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', roles:['encargado','empresa','admin']},
-  {id:'carga',    label:'Cargar',    icon:'M12 4v16m8-8H4', roles:['encargado','admin']},
+  {id:'carga',    label:'Cisterna',    icon:'M12 4v16m8-8H4', roles:['encargado','admin']},
   {id:'estacion', label:'Estación',  icon:'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4', roles:['encargado','empresa','admin']},
   {id:'cargas',   label:'Cargas',    icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01', roles:['encargado','empresa','admin']},
   {id:'equipos',  label:'Equipos',   icon:'M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l3-3h7z M19 16l3-3V8a1 1 0 00-1-1h-5a1 1 0 00-1 1v8h4z', roles:['empresa','admin']},
@@ -1250,6 +1250,16 @@ async function registrarCargaCisterna(){
 }
 
 // ── CARGAS (historial completo) ──────────────────────────
+function limpiarFiltrosCargas(){
+  ['hf-chofer','hf-equipo','hf-contrato','hf-desde','hf-hasta','hf-fuente','hf-cisterna'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.value='';
+  });
+  const limit=document.getElementById('hf-limit');
+  if(limit)limit.value='20';
+  renderCargas();
+}
+
 function renderAcciones(id, fuente){
   if(!fuente) return '—';
   var mid="menu-"+id;
