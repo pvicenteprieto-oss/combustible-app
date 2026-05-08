@@ -2259,8 +2259,10 @@ async function eliminarCarga(id, fuente){
 function docEstadoLicencia(fechaVence){
   if(!fechaVence) return {cls:'b-gray',txt:'Sin fecha'};
   const fechaStr=String(fechaVence).slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(fechaStr)) return {cls:'b-gray',txt:'Fecha inválida'};
   const hoy=new Date(); hoy.setHours(0,0,0,0);
   const vence=new Date(fechaStr+'T00:00:00');
+  if(isNaN(vence)) return {cls:'b-gray',txt:'Fecha inválida'};
   const dias=Math.round((vence-hoy)/86400000);
   if(dias<0) return {cls:'b-dan',txt:`Vencida hace ${Math.abs(dias)} días`};
   if(dias<=30) return {cls:'b-warn',txt:`Vence en ${dias} día${dias===1?'':'s'}`};
@@ -2297,12 +2299,14 @@ function getDocEquipo(equipoId){
 function docEstado(fechaVence){
   if(!fechaVence) return {cls:'b-gray',txt:'Sin fecha',dias:null};
   const fechaDocStr=String(fechaVence).slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(fechaDocStr)) return {cls:'b-gray',txt:'Fecha inválida',dias:null};
   const hoy=new Date(); hoy.setHours(0,0,0,0);
   const vence=new Date(fechaDocStr+'T00:00:00');
+  if(isNaN(vence)) return {cls:'b-gray',txt:'Fecha inválida',dias:null};
   const dias=Math.round((vence-hoy)/86400000);
   if(dias<0) return {cls:'b-dan',txt:`Vencida hace ${Math.abs(dias)} días`,dias};
   if(dias<=15) return {cls:'b-warn',txt:`Vence en ${dias} día${dias===1?'':'s'}`,dias};
-  return {cls:'b-ok',txt:`Vigente (${dias} días)`,dias};
+  return {cls:'b-ok',txt:'Vigente',dias};
 }
 
 function renderDocumentacion(){
@@ -2356,12 +2360,12 @@ function renderDocumentacion(){
             <div style="font-size:12px">
               <span style="color:#666;font-weight:600">VTV:</span>
               <span class="badge ${vtv.cls}" style="margin-left:4px">${vtv.txt}</span>
-              ${doc?.vtvVence?`<span style="color:#aaa;font-size:11px;margin-left:4px">vence ${doc.vtvVence}</span>`:''}
+              ${doc?.vtvVence?`<span style="color:#aaa;font-size:11px;margin-left:4px">vence ${String(doc.vtvVence).slice(0,10)}</span>`:''}
             </div>
             <div style="font-size:12px">
               <span style="color:#3C3489;font-weight:600">YPF:</span>
               <span class="badge ${ypf.cls}" style="margin-left:4px">${ypf.txt}</span>
-              ${doc?.ypfVence?`<span style="color:#aaa;font-size:11px;margin-left:4px">vence ${doc.ypfVence}</span>`:''}
+              ${doc?.ypfVence?`<span style="color:#aaa;font-size:11px;margin-left:4px">vence ${String(doc.ypfVence).slice(0,10)}</span>`:''}
             </div>
           </div>
           ${doc?.obs?`<div class="ic-sub" style="margin-top:4px">${doc.obs}</div>`:''}
