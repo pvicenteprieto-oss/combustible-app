@@ -965,6 +965,7 @@ function applyData(data){
   S.choferes=data.choferes||[];
   S.depositos=data.depositos||[];
   S.auditoria=data.auditoria||[];
+  S.documentacion=data.documentacion||[];
   if(data.estacion_saldo&&data.estacion_saldo.litros!==undefined)S.estacion_saldo=data.estacion_saldo;
   if(data.cisternas&&data.cisternas.length)S.cisternas=data.cisternas.map(c=>({...c,capacidad:+c.capacidad||1500,current:+c.current||0}));
   if(data.config&&data.config.lowAlertPct)S.config={...S.config,...data.config,lowAlertPct:+data.config.lowAlertPct||15,tolerance:+data.config.tolerance||25,minRecords:+data.config.minRecords||3};
