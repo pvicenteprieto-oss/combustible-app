@@ -1175,7 +1175,7 @@ function renderChoferes(){
           <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span style="font-size:12px;color:#666;font-weight:600">Licencia:</span>
             <span class="badge ${lic.cls}">${lic.txt}</span>
-            ${c.licencia?`<span style="font-size:11px;color:#aaa">vence ${c.licencia}</span>`:'<span style="font-size:11px;color:#aaa">Sin fecha cargada</span>'}
+            ${c.licencia?`<span style="font-size:11px;color:#aaa">vence ${String(c.licencia).slice(0,10)}</span>`:'<span style="font-size:11px;color:#aaa">Sin fecha cargada</span>'}
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
@@ -2258,8 +2258,9 @@ async function eliminarCarga(id, fuente){
 // ── LICENCIAS DE CHOFERES ────────────────────────────────
 function docEstadoLicencia(fechaVence){
   if(!fechaVence) return {cls:'b-gray',txt:'Sin fecha'};
+  const fechaStr=String(fechaVence).slice(0,10);
   const hoy=new Date(); hoy.setHours(0,0,0,0);
-  const vence=new Date(fechaVence+'T00:00:00');
+  const vence=new Date(fechaStr+'T00:00:00');
   const dias=Math.round((vence-hoy)/86400000);
   if(dias<0) return {cls:'b-dan',txt:`Vencida hace ${Math.abs(dias)} días`};
   if(dias<=30) return {cls:'b-warn',txt:`Vence en ${dias} día${dias===1?'':'s'}`};
@@ -2295,8 +2296,9 @@ function getDocEquipo(equipoId){
 
 function docEstado(fechaVence){
   if(!fechaVence) return {cls:'b-gray',txt:'Sin fecha',dias:null};
+  const fechaDocStr=String(fechaVence).slice(0,10);
   const hoy=new Date(); hoy.setHours(0,0,0,0);
-  const vence=new Date(fechaVence+'T00:00:00');
+  const vence=new Date(fechaDocStr+'T00:00:00');
   const dias=Math.round((vence-hoy)/86400000);
   if(dias<0) return {cls:'b-dan',txt:`Vencida hace ${Math.abs(dias)} días`,dias};
   if(dias<=15) return {cls:'b-warn',txt:`Vence en ${dias} día${dias===1?'':'s'}`,dias};
