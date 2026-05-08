@@ -1638,7 +1638,7 @@ function calcDepositoLitros(){
   }
 }
 function openDeposito(){
-  if(!document.getElementById('dep-fecha').value)document.getElementById('dep-fecha').value=now();
+  document.getElementById('dep-fecha').value=now();
   showModal('modal-deposito-estacion');
 }
 async function registrarDeposito(){
@@ -1666,7 +1666,7 @@ async function registrarDeposito(){
 // ── CISTERNAS ────────────────────────────────────────────
 function openRecargaCisterna(id){
   const selRC=document.getElementById('rc-cisterna');selRC.innerHTML=S.cisternas.map(c=>`<option value="${c.id}" ${c.id===id?'selected':''}>${c.nombre} — ${c.combustible}</option>`).join('');
-  if(!document.getElementById('rc-date').value)document.getElementById('rc-date').value=now();
+  document.getElementById('rc-date').value=now();
   showModal('modal-recarga-cisterna');
 }
 async function recargarCisterna(){
@@ -1678,6 +1678,12 @@ async function recargarCisterna(){
   }
   const liters=+document.getElementById('rc-liters').value,price=+document.getElementById('rc-price').value||0,station=document.getElementById('rc-station').value.trim(),receipt=document.getElementById('rc-receipt').value.trim(),resp=document.getElementById('rc-resp').value.trim(),date=document.getElementById('rc-date').value||now();
   if(!liters||liters<=0){setAlert('rc-alert','Ingresá los litros.','w');return;}
+  // Validar saldo disponible en estación
+  const saldoEst=S.estacion_saldo?.litros||0;
+  if(liters>saldoEst){
+    setAlert('rc-alert',`Sin saldo suficiente en la estación. Disponible: ${saldoEst.toFixed(0)} L, querés cargar: ${liters} L.`,'d');
+    return;
+  }
   const c=S.cisternas.find(x=>x.id===cId),prev=c.current;
   const espacioDisponible=c.capacidad-prev;
   if(liters>espacioDisponible){setAlert('rc-alert',`No se pueden cargar ${liters} L — la cisterna tiene ${prev.toFixed(0)} L y su capacidad es ${c.capacidad} L. Máximo disponible: ${espacioDisponible.toFixed(0)} L.`,'d');return;}
