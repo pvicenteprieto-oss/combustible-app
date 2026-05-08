@@ -2076,10 +2076,13 @@ async function eliminarRecargaDeposito(id, fuente){
         await api({action:'updateCisterna',id:mov.cisternaId,value:newLevel});
         cist.current=newLevel;
       }
-      // Devolver litros al saldo estación
-      const newSaldo=parseFloat(((S.estacion_saldo?.litros||0)+litros).toFixed(2));
-      await api({action:'updateEstacionSaldo',value:newSaldo});
-      S.estacion_saldo={litros:newSaldo};
+      // Preguntar si devolver litros al saldo estación
+      const saldoActual=S.estacion_saldo?.litros||0;
+      if(confirm(`¿Devolver ${litros.toFixed(0)} L al saldo de la estación?\nSaldo actual: ${saldoActual.toFixed(0)} L → pasaría a ${(saldoActual+litros).toFixed(0)} L`)){
+        const newSaldo=parseFloat((saldoActual+litros).toFixed(2));
+        await api({action:'updateEstacionSaldo',value:newSaldo});
+        S.estacion_saldo={litros:newSaldo};
+      }
     } else {
       await api({action:'deleteDeposito',id});
       S.depositos=S.depositos.filter(d=>d.id!==id);
