@@ -358,7 +358,7 @@ tr:last-child td{border-bottom:none}
             </div>
             <div class="fg"><label>Observaciones</label><input id="en-obs" placeholder="Opcional"/></div>
             <div id="en-alert"></div>
-            <button class="btn pri full" onclick="registrarCargaEstacion()">Registrar carga ↗</button>
+            <button class="btn pri full" id="btn-reg-estacion" onclick="registrarCargaEstacion()">Registrar carga ↗</button>
           </div>
         </div>
 
@@ -831,6 +831,20 @@ if('serviceWorker' in navigator){
 }
 const API='https://script.google.com/macros/s/AKfycbyxg1pw0DHIcLlItPWQgilTRBlp4ag9-8VM7wXaC2Ejam1Bhn5ZQRwGXXeCVzk7rVRb/exec';
 let currentUser=null,currentSection='panel',estTab='nueva',repEstTab='equipo',_saving=false;
+
+function blockUI(btnId, msg='Guardando...'){
+  _saving=true;
+  const btn=document.getElementById(btnId);
+  if(btn){btn.disabled=true;btn._origText=btn.innerHTML;btn.innerHTML='<span class="spinner"></span>'+msg;}
+  // Deshabilitar todos los botones de submit para evitar doble envío
+  document.querySelectorAll('.btn.pri, .btn.suc').forEach(b=>{if(b.id!==btnId)b.disabled=true;});
+}
+function unblockUI(btnId){
+  _saving=false;
+  const btn=document.getElementById(btnId);
+  if(btn){btn.disabled=false;btn.innerHTML=btn._origText||btn.innerHTML;}
+  document.querySelectorAll('.btn.pri, .btn.suc').forEach(b=>b.disabled=false);
+}
 let S={config:{lowAlertPct:15,tolerance:25,minRecords:3,estacion:''},choferes:[],estacion_saldo:{litros:0},depositos:[],auditoria:[],documentacion:[],cisternas:[{id:'c1',nombre:'Cisterna 1',combustible:'Diesel común',capacidad:1500,current:0},{id:'c2',nombre:'Cisterna 2',combustible:'Diesel premium',capacidad:1500,current:0}],usuarios:[],equipos:[],cargas:[],recargas:[],ajustes:[],desvios:[],sesiones:[],cargas_estacion:[],contratos:[]};
 
 function getDeviceId(){let id=localStorage.getItem('dvc');if(!id){id='d'+Date.now().toString(36);localStorage.setItem('dvc',id);}return id;}
@@ -876,7 +890,7 @@ const ROL_LABEL={encargado:'Encargado de combustible',empresa:'Empresa',admin:'A
 const NAV_ITEMS=[
   {id:'panel',    label:'Panel',     icon:'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', roles:['encargado','empresa','admin']},
   {id:'carga',    label:'Cisterna',    icon:'M12 4v16m8-8H4', roles:['encargado','admin']},
-  {id:'estacion', label:'Estación',  icon:'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4', roles:['encargado','empresa','admin']},
+  {id:'estacion', label:'Estación',  icon:'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4', roles:['empresa','admin']},
   {id:'cargas',   label:'Cargas',    icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01', roles:['encargado','empresa','admin']},
   {id:'equipos',  label:'Equipos',   icon:'M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l3-3h7z M19 16l3-3V8a1 1 0 00-1-1h-5a1 1 0 00-1 1v8h4z', roles:['empresa','admin']},
   {id:'contratos',label:'Contratos', icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', roles:['empresa','admin']},
@@ -1215,7 +1229,8 @@ async function removeChofer(id){
 }
 
 async function registrarCargaCisterna(){
-  if(_saving)return;_saving=true;setTimeout(()=>_saving=false,5000);
+  if(_saving)return;
+  blockUI('btn-reg-cisterna');
   clearCache();
   const cisternaId=document.getElementById('cc-cisterna').value,eqId=document.getElementById('cc-equipo').value,driver=getChoferValue('cc-driver-sel','cc-driver-manual'),liters=+document.getElementById('cc-liters').value,taco=document.getElementById('cc-taco').value.trim(),km=document.getElementById('cc-km').value.trim(),jstart=document.getElementById('cc-jstart').value,date=document.getElementById('cc-date').value||now(),obs=document.getElementById('cc-obs').value.trim(),contratoId=document.getElementById('cc-contrato').value;
   const btn=document.getElementById('btn-reg-cisterna');
@@ -1247,8 +1262,8 @@ async function registrarCargaCisterna(){
     document.getElementById('cc-driver-manual').style.display='none';
     document.getElementById('carga-preview').innerHTML='';checkMedicion();renderFormCarga();
     if(!document.getElementById('carga-alert').innerHTML.includes('alerta'))clearAfter('carga-alert');
-  }catch(e){setAlert('carga-alert','Error: '+e.message,'d');}
-  btn.disabled=false;btn.innerHTML='Registrar carga ↗';_saving=false;
+  }catch(e){unblockUI('btn-reg-cisterna');setAlert('carga-alert','Error: '+e.message,'d');}
+  unblockUI('btn-reg-cisterna');
 }
 
 // ── CARGAS (historial completo) ──────────────────────────
@@ -1439,7 +1454,8 @@ function renderEstacion(){
 }
 
 async function registrarCargaEstacion(){
-  if(_saving)return;_saving=true;setTimeout(()=>_saving=false,5000);
+  if(_saving)return;
+  blockUI('btn-reg-estacion');
   clearCache();
   const eqId=document.getElementById('en-equipo').value,driver=getChoferValue('en-driver-sel','en-driver-manual'),liters=+document.getElementById('en-liters').value,fuel=document.getElementById('en-fuel').value,contratoId=document.getElementById('en-contrato').value,receipt=document.getElementById('en-receipt').value.trim(),price=+document.getElementById('en-price').value||0,date=document.getElementById('en-date').value||now(),obs=document.getElementById('en-obs').value.trim();
   if(!eqId||!driver||!liters||liters<=0){setAlert('en-alert','Completá equipo, operador y litros.','w');return;}
@@ -1489,7 +1505,7 @@ async function registrarCargaEstacion(){
     document.getElementById('en-driver-manual').value='';
     document.getElementById('en-driver-manual').style.display='none';
     clearAfter('en-alert');
-  }catch(e){setAlert('en-alert','Error: '+e.message,'d');}
+  }catch(e){unblockUI('btn-reg-estacion');setAlert('en-alert','Error: '+e.message,'d');}
 }
 
 function renderControl(){
