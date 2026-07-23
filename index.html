@@ -1705,18 +1705,17 @@ async function recargarCisterna(){
   const c=S.cisternas.find(x=>x.id===cId),prev=c.current;
   const espacioDisponible=c.capacidad-prev;
   if(liters>espacioDisponible){setAlert('rc-alert',`No se pueden cargar ${liters} L — la cisterna tiene ${prev.toFixed(0)} L y su capacidad es ${c.capacidad} L. Máximo disponible: ${espacioDisponible.toFixed(0)} L.`,'d');return;}
-  const nl=prev+liters;
-  const rec={id:uid(),cisternaId:cId,cisternaName:c.nombre,liters,price,total:price*liters,station,receipt,resp,date,levelBefore:prev,levelAfter:nl};
+ const rec={id:uid(),cisternaId:cId,cisternaName:c.nombre,liters,price,station,receipt,resp,date};
   const btnRC=document.querySelector('#modal-recarga-cisterna .btn.suc');
   if(btnRC){btnRC.disabled=true;btnRC.innerHTML='<span class="spinner"></span>Guardando...';}
   try{
-    await api({action:'addRecarga',data:JSON.stringify(rec)});
-    await api({action:'updateCisterna',id:cId,value:nl});
-    S.recargas.push(rec);c.current=nl;
-    // Descontar del saldo estación
-    const newSaldoCist=Math.max(0,parseFloat(((S.estacion_saldo?.litros||0)-liters).toFixed(2)));
-    await api({action:'updateEstacionSaldo',value:newSaldoCist});
-    S.estacion_saldo={litros:newSaldoCist};
+    const res=await api({action:'addRecargaCisterna',data:JSON.stringify(rec)});
+    if(res.error){throw new Error(res.error);}
+    rec.levelBefore=res.cisternaAfter-liters;
+    rec.levelAfter=res.cisternaAfter;
+    rec.total=price*liters;
+    S.recargas.push(rec);c.current=res.cisternaAfter;
+    S.estacion_saldo={litros:res.saldoAfter};
     if(btnRC){btnRC.disabled=false;btnRC.innerHTML='Confirmar ↗';}
     closeModal('modal-recarga-cisterna');renderPanel();
   }catch(e){setAlert('rc-alert','Error: '+e.message,'d');if(btnRC){btnRC.disabled=false;btnRC.innerHTML='Confirmar ↗';}}
