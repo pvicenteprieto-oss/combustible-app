@@ -1046,6 +1046,26 @@ function checkDesvio(load,equipo){
   return null;
 }
 
+// ── SALDO ESTACIÓN EN DINERO ─────────────────────────────
+// El precio se toma como el promedio ponderado de todos los depósitos
+// registrados (monto total depositado / litros totales acreditados). Como
+// el dinero disponible siempre se calcula como litros × precio promedio,
+// el saldo en dinero llega a $0 exactamente cuando el saldo en litros
+// llega a 0 (y viceversa), sin necesidad de llevar dos contadores que
+// puedan desincronizarse.
+function getEstacionPrecioPromedio(){
+  const totalMonto=S.depositos.reduce((a,b)=>a+(+b.monto||0),0);
+  const totalLitros=S.depositos.reduce((a,b)=>a+(+b.litros||0),0);
+  return totalLitros>0?totalMonto/totalLitros:0;
+}
+function getEstacionSaldoDinero(){
+  const litros=S.estacion_saldo?.litros||0;
+  return litros*getEstacionPrecioPromedio();
+}
+function fmtMoney(n){
+  return'$'+(+n||0).toLocaleString('es-AR',{maximumFractionDigits:0});
+}
+
 // ── PANEL ────────────────────────────────────────────────
 function renderPanel(){
   const hoy=S.cargas.filter(l=>new Date(l.date).toDateString()===todayStr());
@@ -1070,10 +1090,13 @@ function renderPanel(){
   const maxLitEst=S.depositos.reduce((a,b)=>a+(+b.litros||0),0)||1;
   const pctEst=Math.min(100,Math.round(litEst/Math.max(litEst,maxLitEst)*100));
   const canDeposit=currentUser.rol==='empresa'||currentUser.rol==='admin';
+  const precioProm=getEstacionPrecioPromedio();
+  const dinEst=getEstacionSaldoDinero();
   document.getElementById('panel-estacion').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-      <div style="display:flex;align-items:center;gap:12px">
+      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
         <div style="font-size:22px;font-weight:700">${litEst.toFixed(0)} L</div>
+        ${canDeposit?`<div style="font-size:16px;font-weight:700;color:#3B6D11">${fmtMoney(dinEst)}</div>`:''}
         <span class="badge ${litEst<=0?'b-dan':litEst<200?'b-warn':'b-ok'}">${litEst<=0?'Sin saldo':litEst<200?'Saldo bajo':'Disponible'}</span>
       </div>
       ${canDeposit?`<button class="btn suc" style="padding:6px 14px;font-size:13px" onclick="openDeposito()">+ Registrar depósito</button>`:''}
@@ -1081,7 +1104,7 @@ function renderPanel(){
     <div class="prog-bar" style="height:8px;margin-bottom:8px">
       <div class="prog-fill ${litEst<=0?'over':''}" style="width:${Math.max(0,pctEst)}%;background:${litEst<=0?'#A32D2D':litEst<200?'#BA7517':'#3B6D11'}"></div>
     </div>
-    <div style="font-size:12px;color:#888">Litros disponibles para cargar en ${S.config.estacion||'la estación de servicio'}</div>
+    <div style="font-size:12px;color:#888">Litros disponibles para cargar en ${S.config.estacion||'la estación de servicio'}${canDeposit&&precioProm>0?` — precio promedio $${precioProm.toLocaleString('es-AR',{maximumFractionDigits:2})}/L`:''}</div>
     ${S.depositos.length?`<div style="margin-top:10px;font-size:12px;color:#888">Último depósito: ${S.depositos.slice(-1)[0].litros?.toFixed(0)||'-'} L — ${fdt(S.depositos.slice(-1)[0].fecha)}</div>`:''}
   `;
 
@@ -1440,7 +1463,7 @@ function renderEstacion(){
     if(puedeS&&saldo>0){
       divSalvar.style.display='block';
       divSalvar.innerHTML=`<div class="alert al-w" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <span>Saldo actual: <b>${saldo.toFixed(0)} L</b>. Si los litros reales se agotaron, podés salvar la diferencia y poner el saldo en 0.</span>
+        <span>Saldo actual: <b>${saldo.toFixed(0)} L</b> (<b>${fmtMoney(getEstacionSaldoDinero())}</b>). Si los litros reales se agotaron, podés salvar la diferencia y poner el saldo en 0.</span>
         <button class="btn dan" style="padding:6px 14px;font-size:13px;white-space:nowrap" onclick="salvarDiferenciaEstacion()">Salvar diferencia ↗</button>
       </div>`;
     } else {
@@ -1596,7 +1619,8 @@ async function salvarDiferencia(cisternaId){
 async function salvarDiferenciaEstacion(){
   const saldo=S.estacion_saldo?.litros||0;
   if(saldo<=0){alert('El saldo ya está en 0.');return;}
-  const motivo=prompt(`El saldo de la estación es ${saldo.toFixed(0)} L.\nEsto lo pondrá en 0 y registrará la diferencia en el historial.\n\nIngresá el motivo (obligatorio):`);
+  const dineroSalvado=getEstacionSaldoDinero();
+  const motivo=prompt(`El saldo de la estación es ${saldo.toFixed(0)} L (${fmtMoney(dineroSalvado)}).\nEsto lo pondrá en 0 y registrará la diferencia en el historial.\n\nIngresá el motivo (obligatorio):`);
   if(motivo===null)return;
   if(!motivo.trim()){alert('El motivo es obligatorio.');return;}
 
@@ -1604,6 +1628,7 @@ async function salvarDiferenciaEstacion(){
     id:uid(), fecha:now(),
     tipo:'salvar_diferencia_estacion',
     litrosAntes:saldo, litrosDespues:0,
+    dineroAntes:dineroSalvado, dineroDespues:0,
     diferencia:saldo,
     motivo:motivo.trim(),
     usuario:currentUser.nombre||currentUser.username
@@ -1637,7 +1662,7 @@ async function salvarDiferenciaEstacion(){
 
     renderEstacion();
     renderPanel();
-    alert(`Diferencia salvada. Saldo de estación queda en 0 L. Se registraron ${saldo.toFixed(0)} L de diferencia en el historial.`);
+    alert(`Diferencia salvada. Saldo de estación queda en 0 L ($0). Se registraron ${saldo.toFixed(0)} L (${fmtMoney(dineroSalvado)}) de diferencia en el historial.`);
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -2544,7 +2569,7 @@ function renderAnalisis(){
           <span class="badge ${clsEst}">${diasRestEst!==null?diasRestEst+' días':'Sin datos'}</span>
         </div>
         <div style="font-size:12px;color:#888">
-          ${(S.estacion_saldo?.litros||0).toFixed(0)} L disponibles — ${lDiaEst.toFixed(1)} L/día promedio
+          ${(S.estacion_saldo?.litros||0).toFixed(0)} L (${fmtMoney(getEstacionSaldoDinero())}) disponibles — ${lDiaEst.toFixed(1)} L/día promedio
           ${fechaEstEst?`<br>Se agota aprox. el <b>${fechaEstEst.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'})}</b>`:''}
         </div>
       </div>`;
