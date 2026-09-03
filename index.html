@@ -1047,16 +1047,19 @@ function checkDesvio(load,equipo){
 }
 
 // ── SALDO ESTACIÓN EN DINERO ─────────────────────────────
-// El precio se toma como el promedio ponderado de todos los depósitos
-// registrados (monto total depositado / litros totales acreditados). Como
-// el dinero disponible siempre se calcula como litros × precio promedio,
-// el saldo en dinero llega a $0 exactamente cuando el saldo en litros
-// llega a 0 (y viceversa), sin necesidad de llevar dos contadores que
-// puedan desincronizarse.
+// El precio activo es el del depósito más reciente (por fecha). Al
+// registrar un depósito nuevo, ese precio pasa a ser el vigente para todo
+// el saldo (el viejo + el nuevo litraje), reemplazando al anterior — igual
+// criterio que ya usa el resto de la app (p.ej. el recálculo del último
+// depósito cuando el saldo queda negativo). Como el dinero disponible
+// siempre se calcula como litros × precio vigente, el saldo en dinero
+// llega a $0 exactamente cuando el saldo en litros llega a 0 (y
+// viceversa), sin necesidad de llevar dos contadores que puedan
+// desincronizarse.
 function getEstacionPrecioPromedio(){
-  const totalMonto=S.depositos.reduce((a,b)=>a+(+b.monto||0),0);
-  const totalLitros=S.depositos.reduce((a,b)=>a+(+b.litros||0),0);
-  return totalLitros>0?totalMonto/totalLitros:0;
+  if(!S.depositos.length)return 0;
+  const ultimo=[...S.depositos].sort((a,b)=>new Date(b.fecha||b.date)-new Date(a.fecha||a.date))[0];
+  return+ultimo.precio||0;
 }
 function getEstacionSaldoDinero(){
   const litros=S.estacion_saldo?.litros||0;
@@ -1104,7 +1107,7 @@ function renderPanel(){
     <div class="prog-bar" style="height:8px;margin-bottom:8px">
       <div class="prog-fill ${litEst<=0?'over':''}" style="width:${Math.max(0,pctEst)}%;background:${litEst<=0?'#A32D2D':litEst<200?'#BA7517':'#3B6D11'}"></div>
     </div>
-    <div style="font-size:12px;color:#888">Litros disponibles para cargar en ${S.config.estacion||'la estación de servicio'}${canDeposit&&precioProm>0?` — precio promedio $${precioProm.toLocaleString('es-AR',{maximumFractionDigits:2})}/L`:''}</div>
+    <div style="font-size:12px;color:#888">Litros disponibles para cargar en ${S.config.estacion||'la estación de servicio'}${canDeposit&&precioProm>0?` — precio vigente $${precioProm.toLocaleString('es-AR',{maximumFractionDigits:2})}/L`:''}</div>
     ${S.depositos.length?`<div style="margin-top:10px;font-size:12px;color:#888">Último depósito: ${S.depositos.slice(-1)[0].litros?.toFixed(0)||'-'} L — ${fdt(S.depositos.slice(-1)[0].fecha)}</div>`:''}
   `;
 
