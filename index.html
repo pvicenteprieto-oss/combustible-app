@@ -1347,7 +1347,7 @@ function renderCargas(){
       combustible:S.cisternas.find(c=>c.id===l.cisternaId)?.combustible||'-',
       contrato:l.contratoNombre||'', contratoId:l.contratoId||'',
       cisternaId:l.cisternaId||'',
-      tacometro:String(l.tacometer||l.horasJornada||''), km:l.km||'', obs:l.obs||'', fuente:'Cisterna',
+      tacometro:String(l.tacometer||l.horasJornada||''), km:l.km||'', obs:l.obs||'', fuente:S.cisternas.find(c=>c.id===l.cisternaId)?.nombre||'Cisterna',
       registradoPor:l.registradoPor||'', detalle:''
     })),
     ...S.cargas_estacion.map(l=>({
