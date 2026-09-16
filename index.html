@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+cafe<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
@@ -1046,29 +1046,6 @@ function checkDesvio(load,equipo){
   return null;
 }
 
-// ── SALDO ESTACIÓN EN DINERO ─────────────────────────────
-// El precio activo es el del depósito más reciente (por fecha). Al
-// registrar un depósito nuevo, ese precio pasa a ser el vigente para todo
-// el saldo (el viejo + el nuevo litraje), reemplazando al anterior — igual
-// criterio que ya usa el resto de la app (p.ej. el recálculo del último
-// depósito cuando el saldo queda negativo). Como el dinero disponible
-// siempre se calcula como litros × precio vigente, el saldo en dinero
-// llega a $0 exactamente cuando el saldo en litros llega a 0 (y
-// viceversa), sin necesidad de llevar dos contadores que puedan
-// desincronizarse.
-function getEstacionPrecioPromedio(){
-  if(!S.depositos.length)return 0;
-  const ultimo=[...S.depositos].sort((a,b)=>new Date(b.fecha||b.date)-new Date(a.fecha||a.date))[0];
-  return+ultimo.precio||0;
-}
-function getEstacionSaldoDinero(){
-  const litros=S.estacion_saldo?.litros||0;
-  return litros*getEstacionPrecioPromedio();
-}
-function fmtMoney(n){
-  return'$'+(+n||0).toLocaleString('es-AR',{maximumFractionDigits:0});
-}
-
 // ── PANEL ────────────────────────────────────────────────
 function renderPanel(){
   const hoy=S.cargas.filter(l=>new Date(l.date).toDateString()===todayStr());
@@ -1093,13 +1070,10 @@ function renderPanel(){
   const maxLitEst=S.depositos.reduce((a,b)=>a+(+b.litros||0),0)||1;
   const pctEst=Math.min(100,Math.round(litEst/Math.max(litEst,maxLitEst)*100));
   const canDeposit=currentUser.rol==='empresa'||currentUser.rol==='admin';
-  const precioProm=getEstacionPrecioPromedio();
-  const dinEst=getEstacionSaldoDinero();
   document.getElementById('panel-estacion').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:12px">
         <div style="font-size:22px;font-weight:700">${litEst.toFixed(0)} L</div>
-        ${canDeposit?`<div style="font-size:16px;font-weight:700;color:#3B6D11">${fmtMoney(dinEst)}</div>`:''}
         <span class="badge ${litEst<=0?'b-dan':litEst<200?'b-warn':'b-ok'}">${litEst<=0?'Sin saldo':litEst<200?'Saldo bajo':'Disponible'}</span>
       </div>
       ${canDeposit?`<button class="btn suc" style="padding:6px 14px;font-size:13px" onclick="openDeposito()">+ Registrar depósito</button>`:''}
@@ -1107,7 +1081,7 @@ function renderPanel(){
     <div class="prog-bar" style="height:8px;margin-bottom:8px">
       <div class="prog-fill ${litEst<=0?'over':''}" style="width:${Math.max(0,pctEst)}%;background:${litEst<=0?'#A32D2D':litEst<200?'#BA7517':'#3B6D11'}"></div>
     </div>
-    <div style="font-size:12px;color:#888">Litros disponibles para cargar en ${S.config.estacion||'la estación de servicio'}${canDeposit&&precioProm>0?` — precio vigente $${precioProm.toLocaleString('es-AR',{maximumFractionDigits:2})}/L`:''}</div>
+    <div style="font-size:12px;color:#888">Litros disponibles para cargar en ${S.config.estacion||'la estación de servicio'}</div>
     ${S.depositos.length?`<div style="margin-top:10px;font-size:12px;color:#888">Último depósito: ${S.depositos.slice(-1)[0].litros?.toFixed(0)||'-'} L — ${fdt(S.depositos.slice(-1)[0].fecha)}</div>`:''}
   `;
 
@@ -1271,15 +1245,13 @@ async function registrarCargaCisterna(){
   const used=S.cargas.filter(l=>l.equipoId===eqId&&new Date(l.date).toDateString()===todayStr()).reduce((a,b)=>a+b.liters,0);
   if(used+liters>eq.quota*1.2){setAlert('carga-alert','Supera el 120% de la cuota diaria. Requiere autorización.','d');return;}
   let horasJornada=0;if(jstart){const ld=new Date(date);const[hh,mm]=jstart.split(':').map(Number);const st=new Date(ld);st.setHours(hh,mm,0);horasJornada=Math.max(0,(ld-st)/3600000);}
- const contrato=S.contratos.find(c=>c.id===contratoId);
-  const load={id:uid(),cisternaId,equipoId:eqId,plate:eq.plate,tipoEquipo:eq.tipo,driver,liters,tacometer:taco||'',km:km||'',horasJornada:parseFloat(horasJornada.toFixed(2)),date,obs,contratoId:contratoId||'',contratoNombre:contrato?contrato.nombre:'',registradoPor:currentUser.nombre||currentUser.username};
+  const newLevel=parseFloat((cisterna.current-liters).toFixed(2));
+  const contrato=S.contratos.find(c=>c.id===contratoId);
+  const load={id:uid(),cisternaId,equipoId:eqId,plate:eq.plate,tipoEquipo:eq.tipo,driver,liters,tacometer:taco||'',km:km||'',horasJornada:parseFloat(horasJornada.toFixed(2)),date,obs,contratoId:contratoId||'',contratoNombre:contrato?contrato.nombre:'',cisternaBefore:cisterna.current,cisternaAfter:newLevel,registradoPor:currentUser.nombre||currentUser.username};
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Guardando...';
   try{
-    const res=await api({action:'addCargaCisterna',data:JSON.stringify(load)});
-    if(res.error){throw new Error(res.error);}
-    load.cisternaBefore=res.cisternaBefore!==undefined?res.cisternaBefore:cisterna.current;
-    load.cisternaAfter=res.cisternaAfter;
-    S.cargas.push(load);cisterna.current=res.cisternaAfter;
+    await api({action:'addCarga',data:JSON.stringify(load)});await api({action:'updateCisterna',id:cisternaId,value:newLevel});
+    S.cargas.push(load);cisterna.current=newLevel;
     if(eq.driver!==driver){eq.driver=driver;await api({action:'updateEquipo',data:JSON.stringify(eq)});}
     const desv=checkDesvio(load,eq);
     if(desv){await api({action:'addDesvio',data:JSON.stringify(desv)});S.desvios.push(desv);setAlert('carga-alert',`Registrado con alerta de consumo ${desv.tipo} (${desv.desvPct>0?'+':''}${desv.desvPct.toFixed(0)}%). Verificar.`,'d');}
@@ -1426,7 +1398,7 @@ function renderCargas(){
         <td>${l.chofer}</td>
         <td>${l.litros.toFixed(0)} L</td>
         <td>${l.combustible}</td>
-        <td>${l.superaSaldo?'<span class="badge b-dan" style="margin-right:4px">⚠ Excedió saldo</span>':''}<span class="badge ${{'Cisterna':'b-info','Estación':'b-teal','Recarga cisterna':'b-purple','Depósito estación':'b-ok'}[l.fuente]||'b-gray'}">${l.fuente}</span></td>
+        <td>${l.superaSaldo?'<span class="badge b-dan" style="margin-right:4px">⚠ Excedió saldo</span>':''}<span class="badge ${l.fuente==='Estación'?'b-teal':l.fuente==='Recarga cisterna'?'b-purple':l.fuente==='Depósito estación'?'b-ok':'b-info'}">${l.fuente}</span></td>
         <td>${l.contrato||'-'}</td>
         <td>${l.tacometro||'-'}</td>
         <td>${l.km||'-'}</td>
@@ -1466,7 +1438,7 @@ function renderEstacion(){
     if(puedeS&&saldo>0){
       divSalvar.style.display='block';
       divSalvar.innerHTML=`<div class="alert al-w" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <span>Saldo actual: <b>${saldo.toFixed(0)} L</b> (<b>${fmtMoney(getEstacionSaldoDinero())}</b>). Si los litros reales se agotaron, podés salvar la diferencia y poner el saldo en 0.</span>
+        <span>Saldo actual: <b>${saldo.toFixed(0)} L</b>. Si los litros reales se agotaron, podés salvar la diferencia y poner el saldo en 0.</span>
         <button class="btn dan" style="padding:6px 14px;font-size:13px;white-space:nowrap" onclick="salvarDiferenciaEstacion()">Salvar diferencia ↗</button>
       </div>`;
     } else {
@@ -1622,8 +1594,7 @@ async function salvarDiferencia(cisternaId){
 async function salvarDiferenciaEstacion(){
   const saldo=S.estacion_saldo?.litros||0;
   if(saldo<=0){alert('El saldo ya está en 0.');return;}
-  const dineroSalvado=getEstacionSaldoDinero();
-  const motivo=prompt(`El saldo de la estación es ${saldo.toFixed(0)} L (${fmtMoney(dineroSalvado)}).\nEsto lo pondrá en 0 y registrará la diferencia en el historial.\n\nIngresá el motivo (obligatorio):`);
+  const motivo=prompt(`El saldo de la estación es ${saldo.toFixed(0)} L.\nEsto lo pondrá en 0 y registrará la diferencia en el historial.\n\nIngresá el motivo (obligatorio):`);
   if(motivo===null)return;
   if(!motivo.trim()){alert('El motivo es obligatorio.');return;}
 
@@ -1631,7 +1602,6 @@ async function salvarDiferenciaEstacion(){
     id:uid(), fecha:now(),
     tipo:'salvar_diferencia_estacion',
     litrosAntes:saldo, litrosDespues:0,
-    dineroAntes:dineroSalvado, dineroDespues:0,
     diferencia:saldo,
     motivo:motivo.trim(),
     usuario:currentUser.nombre||currentUser.username
@@ -1665,7 +1635,7 @@ async function salvarDiferenciaEstacion(){
 
     renderEstacion();
     renderPanel();
-    alert(`Diferencia salvada. Saldo de estación queda en 0 L ($0). Se registraron ${saldo.toFixed(0)} L (${fmtMoney(dineroSalvado)}) de diferencia en el historial.`);
+    alert(`Diferencia salvada. Saldo de estación queda en 0 L. Se registraron ${saldo.toFixed(0)} L de diferencia en el historial.`);
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -1733,17 +1703,18 @@ async function recargarCisterna(){
   const c=S.cisternas.find(x=>x.id===cId),prev=c.current;
   const espacioDisponible=c.capacidad-prev;
   if(liters>espacioDisponible){setAlert('rc-alert',`No se pueden cargar ${liters} L — la cisterna tiene ${prev.toFixed(0)} L y su capacidad es ${c.capacidad} L. Máximo disponible: ${espacioDisponible.toFixed(0)} L.`,'d');return;}
- const rec={id:uid(),cisternaId:cId,cisternaName:c.nombre,liters,price,station,receipt,resp,date};
+  const nl=prev+liters;
+  const rec={id:uid(),cisternaId:cId,cisternaName:c.nombre,liters,price,total:price*liters,station,receipt,resp,date,levelBefore:prev,levelAfter:nl};
   const btnRC=document.querySelector('#modal-recarga-cisterna .btn.suc');
   if(btnRC){btnRC.disabled=true;btnRC.innerHTML='<span class="spinner"></span>Guardando...';}
   try{
-    const res=await api({action:'addRecargaCisterna',data:JSON.stringify(rec)});
-    if(res.error){throw new Error(res.error);}
-    rec.levelBefore=res.cisternaAfter-liters;
-    rec.levelAfter=res.cisternaAfter;
-    rec.total=price*liters;
-    S.recargas.push(rec);c.current=res.cisternaAfter;
-    S.estacion_saldo={litros:res.saldoAfter};
+    await api({action:'addRecarga',data:JSON.stringify(rec)});
+    await api({action:'updateCisterna',id:cId,value:nl});
+    S.recargas.push(rec);c.current=nl;
+    // Descontar del saldo estación
+    const newSaldoCist=Math.max(0,parseFloat(((S.estacion_saldo?.litros||0)-liters).toFixed(2)));
+    await api({action:'updateEstacionSaldo',value:newSaldoCist});
+    S.estacion_saldo={litros:newSaldoCist};
     if(btnRC){btnRC.disabled=false;btnRC.innerHTML='Confirmar ↗';}
     closeModal('modal-recarga-cisterna');renderPanel();
   }catch(e){setAlert('rc-alert','Error: '+e.message,'d');if(btnRC){btnRC.disabled=false;btnRC.innerHTML='Confirmar ↗';}}
@@ -2572,7 +2543,7 @@ function renderAnalisis(){
           <span class="badge ${clsEst}">${diasRestEst!==null?diasRestEst+' días':'Sin datos'}</span>
         </div>
         <div style="font-size:12px;color:#888">
-          ${(S.estacion_saldo?.litros||0).toFixed(0)} L (${fmtMoney(getEstacionSaldoDinero())}) disponibles — ${lDiaEst.toFixed(1)} L/día promedio
+          ${(S.estacion_saldo?.litros||0).toFixed(0)} L disponibles — ${lDiaEst.toFixed(1)} L/día promedio
           ${fechaEstEst?`<br>Se agota aprox. el <b>${fechaEstEst.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'})}</b>`:''}
         </div>
       </div>`;
