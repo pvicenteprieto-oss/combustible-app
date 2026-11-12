@@ -704,19 +704,14 @@ tr:last-child td{border-bottom:none}
 <div class="overlay" id="modal-recarga-cisterna">
   <div class="modal">
     <div class="modal-title">Recargar cisterna <button class="modal-close" onclick="closeModal('modal-recarga-cisterna')">✕</button></div>
+    <div class="hint-box">Las cisternas se manejan en obra. Esta recarga suma litros a la cisterna y no afecta el saldo de la estación de servicio.</div>
     <div class="fg"><label>Cisterna</label><select id="rc-cisterna"></select></div>
-    <div class="fg"><label>Origen del combustible</label>
-      <select id="rc-origen" onchange="onOrigenRecargaChange()">
-        <option value="estacion">Estación de servicio (descuenta del saldo)</option>
-        <option value="proveedor">Proveedor directo (no toca el saldo de la estación)</option>
-      </select></div>
-    <div id="rc-origen-info" class="hint-box"></div>
     <div class="row2">
       <div class="fg"><label>Litros cargados</label><input id="rc-liters" type="number" min="1" placeholder="0"/></div>
       <div class="fg"><label>Precio por litro ($)</label><input id="rc-price" type="number" step="0.01" placeholder="0.00"/></div>
     </div>
     <div class="row2">
-      <div class="fg"><label id="rc-station-lbl">Estación</label><input id="rc-station" placeholder="Nombre"/></div>
+      <div class="fg"><label>Proveedor (opcional)</label><input id="rc-station" placeholder="Nombre del proveedor"/></div>
       <div class="fg"><label>N° remito</label><input id="rc-receipt" placeholder="0000-00000000"/></div>
     </div>
     <div class="row2">
@@ -1337,8 +1332,7 @@ function renderCargas(){
         litros:+l.liters||0, combustible:c?c.combustible:'-',
         contrato:'', contratoId:'', cisternaId:l.cisternaId||'',
         tacometro:'', km:'', obs:l.obs||'', fuente:'Recarga cisterna', tipo:'Recarga cisterna',
-        registradoPor:l.resp||l.registradoPor||'', origen:origenRecarga(l),
-        detalle:`${c?c.nombre:'-'} — ${origenRecarga(l)==='proveedor'?'Proveedor'+(l.station?': '+l.station:''):'Estación'+(l.station?': '+l.station:'')} — $${(+l.price||0).toFixed(2)}/L${l.receipt?' — Remito: '+l.receipt:''}`
+        registradoPor:l.resp||l.registradoPor||'', detalle:`${c?c.nombre:'-'}${l.station?' — '+l.station:''}${+l.price?' — $'+(+l.price).toFixed(2)+'/L':''}${l.receipt?' — Remito: '+l.receipt:''}`
       };
     }),
     ...S.depositos.map(l=>({
@@ -1405,7 +1399,7 @@ function renderCargas(){
         <td>${l.chofer}</td>
         <td>${l.litros.toFixed(0)} L</td>
         <td>${l.combustible}</td>
-        <td>${l.superaSaldo?'<span class="badge b-dan" style="margin-right:4px">⚠ Excedió saldo</span>':''}${l.origen==='proveedor'?'<span class="badge b-warn" style="margin-right:4px">Proveedor</span>':''}<span class="badge ${l.fuente==='Estación'?'b-teal':l.fuente==='Recarga cisterna'?'b-purple':l.fuente==='Depósito estación'?'b-ok':'b-info'}">${l.fuente}</span></td>
+        <td>${l.superaSaldo?'<span class="badge b-dan" style="margin-right:4px">⚠ Excedió saldo</span>':''}<span class="badge ${l.fuente==='Estación'?'b-teal':l.fuente==='Recarga cisterna'?'b-purple':l.fuente==='Depósito estación'?'b-ok':'b-info'}">${l.fuente}</span></td>
         <td>${l.contrato||'-'}</td>
         <td>${l.tacometro||'-'}</td>
         <td>${l.km||'-'}</td>
@@ -1688,69 +1682,38 @@ async function registrarDeposito(){
 
 // ── CISTERNAS ────────────────────────────────────────────
 function openRecargaCisterna(id){
-  const selRC=document.getElementById('rc-cisterna');selRC.innerHTML=S.cisternas.map(c=>`<option value="${c.id}" ${c.id===id?'selected':''}>${c.nombre} — ${c.combustible}</option>`).join('');
+  const selRC=document.getElementById('rc-cisterna');selRC.innerHTML=S.cisternas.map(c=>`<option value="${c.id}" ${c.id===id?'selected':''}>${c.nombre} — ${c.combustible} (${c.current.toFixed(0)} / ${c.capacidad} L)</option>`).join('');
   document.getElementById('rc-date').value=now();
-  document.getElementById('rc-origen').value='estacion';
-  document.getElementById('rc-station').value='';
+  if(!document.getElementById('rc-resp').value)document.getElementById('rc-resp').value=currentUser.nombre||currentUser.username;
   setAlert('rc-alert','');
-  onOrigenRecargaChange();
   showModal('modal-recarga-cisterna');
 }
-function onOrigenRecargaChange(){
-  const origen=document.getElementById('rc-origen').value;
-  const lbl=document.getElementById('rc-station-lbl');
-  const inp=document.getElementById('rc-station');
-  const info=document.getElementById('rc-origen-info');
-  const saldoEst=S.estacion_saldo?.litros||0;
-  if(origen==='proveedor'){
-    lbl.textContent='Proveedor';
-    inp.placeholder='Nombre del proveedor';
-    if(inp.value===(S.config.estacion||''))inp.value='';
-    info.innerHTML='Compra directa: se suman los litros a la cisterna y <b>no</b> se descuenta nada del saldo de la estación.';
-  } else {
-    lbl.textContent='Estación';
-    inp.placeholder='Nombre';
-    if(!inp.value)inp.value=S.config.estacion||'';
-    info.innerHTML=`Se descuenta del saldo de la estación. Disponible: <b>${saldoEst.toFixed(0)} L</b>.`;
-  }
-}
-function origenRecarga(r){return String(r?.origen||'estacion')==='proveedor'?'proveedor':'estacion';}
 async function recargarCisterna(){
   const cId=document.getElementById('rc-cisterna').value;
-  const cNeg=S.cisternas.find(x=>x.id===cId);
-  if(cNeg&&cNeg.current<0){
-    setAlert('rc-alert',`No se puede recargar ${cNeg.nombre} con saldo negativo (${cNeg.current.toFixed(0)} L). Primero salvá la diferencia desde el Panel.`,'d');
+  const c=S.cisternas.find(x=>x.id===cId);
+  if(!c)return;
+  if(c.current<0){
+    setAlert('rc-alert',`No se puede recargar ${c.nombre} con saldo negativo (${c.current.toFixed(0)} L). Primero salvá la diferencia desde el Panel.`,'d');
     return;
   }
-  const origen=document.getElementById('rc-origen').value==='proveedor'?'proveedor':'estacion';
   const liters=+document.getElementById('rc-liters').value,price=+document.getElementById('rc-price').value||0,station=document.getElementById('rc-station').value.trim(),receipt=document.getElementById('rc-receipt').value.trim(),resp=document.getElementById('rc-resp').value.trim(),date=document.getElementById('rc-date').value||now();
   if(!liters||liters<=0){setAlert('rc-alert','Ingresá los litros.','w');return;}
-  if(origen==='proveedor'&&!station){setAlert('rc-alert','Ingresá el nombre del proveedor.','w');return;}
-  // Validar saldo disponible en estación (solo si sale de la estación)
-  const saldoEst=S.estacion_saldo?.litros||0;
-  if(origen==='estacion'&&liters>saldoEst){
-    setAlert('rc-alert',`Sin saldo suficiente en la estación. Disponible: ${saldoEst.toFixed(0)} L, querés cargar: ${liters} L. Si el combustible viene de un proveedor, cambiá el origen.`,'d');
-    return;
-  }
-  const c=S.cisternas.find(x=>x.id===cId),prev=c.current;
-  const espacioDisponible=c.capacidad-prev;
+  const prev=c.current,espacioDisponible=c.capacidad-prev;
   if(liters>espacioDisponible){setAlert('rc-alert',`No se pueden cargar ${liters} L — la cisterna tiene ${prev.toFixed(0)} L y su capacidad es ${c.capacidad} L. Máximo disponible: ${espacioDisponible.toFixed(0)} L.`,'d');return;}
-  const rec={id:uid(),cisternaId:cId,cisternaName:c.nombre,liters,price,total:price*liters,station,receipt,resp,date,origen,registradoPor:currentUser.nombre||currentUser.username};
+  const rec={id:uid(),cisternaId:cId,cisternaName:c.nombre,liters,price,total:price*liters,station,receipt,resp,date,registradoPor:currentUser.nombre||currentUser.username};
   const btnRC=document.querySelector('#modal-recarga-cisterna .btn.suc');
   if(btnRC){btnRC.disabled=true;btnRC.innerHTML='<span class="spinner"></span>Guardando...';}
   clearCache();
   try{
-    // El servidor valida, actualiza cisterna y (si corresponde) el saldo de la estación en una sola operación
+    // El servidor valida capacidad, suma a la cisterna y guarda la recarga (no toca el saldo de la estación)
     const res=await api({action:'addRecargaCisterna',data:JSON.stringify(rec)});
-    rec.levelBefore=prev;
-    rec.levelAfter=+res.cisternaAfter;
-    S.recargas.push(rec);
-    c.current=+res.cisternaAfter;
-    if(origen==='estacion'&&res.saldoAfter!==null&&res.saldoAfter!==undefined)S.estacion_saldo={litros:+res.saldoAfter};
-    if(btnRC){btnRC.disabled=false;btnRC.innerHTML='Confirmar ↗';}
-    ['rc-liters','rc-price','rc-station','rc-receipt','rc-resp'].forEach(id=>document.getElementById(id).value='');
+    rec.levelBefore=prev;rec.levelAfter=+res.cisternaAfter;
+    S.recargas.push(rec);c.current=+res.cisternaAfter;
+    ['rc-liters','rc-price','rc-station','rc-receipt'].forEach(id=>document.getElementById(id).value='');
     closeModal('modal-recarga-cisterna');renderPanel();
-  }catch(e){setAlert('rc-alert','Error: '+e.message,'d');if(btnRC){btnRC.disabled=false;btnRC.innerHTML='Confirmar ↗';}}
+    if(currentSection==='carga')renderFormCarga();
+  }catch(e){setAlert('rc-alert','Error: '+e.message,'d');}
+  if(btnRC){btnRC.disabled=false;btnRC.innerHTML='Confirmar ↗';}
 }
 
 // ── EQUIPOS ──────────────────────────────────────────────
@@ -2004,19 +1967,13 @@ function abrirEditRecargaDeposito(id, fuente){
       </div>
       <div class="row2">
         <div class="fg"><label>Precio por litro ($)</label><input id="emov-precio" type="number" step="0.01" value="${+mov.price||0}"/></div>
-        <div class="fg"><label>Estación / proveedor</label><input id="emov-estacion" value="${mov.station||''}"/></div>
+        <div class="fg"><label>Proveedor</label><input id="emov-estacion" value="${mov.station||''}"/></div>
       </div>
       <div class="row2">
         <div class="fg"><label>N° remito</label><input id="emov-remito" value="${mov.receipt||''}"/></div>
         <div class="fg"><label>Fecha y hora</label><input id="emov-fecha" type="datetime-local" value="${mov.date||''}"/></div>
       </div>
-      <div class="row2">
-        <div class="fg"><label>Responsable</label><input id="emov-resp" value="${mov.resp||''}"/></div>
-        <div class="fg"><label>Origen</label><select id="emov-origen">
-          <option value="estacion" ${origenRecarga(mov)==='estacion'?'selected':''}>Estación de servicio</option>
-          <option value="proveedor" ${origenRecarga(mov)==='proveedor'?'selected':''}>Proveedor directo</option>
-        </select></div>
-      </div>`;
+      <div class="fg"><label>Responsable</label><input id="emov-resp" value="${mov.resp||''}"/></div>`;
   } else {
     campos=`
       <div class="row2">
@@ -2062,9 +2019,7 @@ async function guardarEditMovimiento(){
       const fecha=document.getElementById('emov-fecha').value;
       const resp=document.getElementById('emov-resp').value.trim();
       const rec=S.recargas.find(r=>r.id===id);
-      const origenAntes=origenRecarga(rec);
-      const origenNew=document.getElementById('emov-origen')?.value==='proveedor'?'proveedor':'estacion';
-      const updated={...rec,cisternaId,liters:litrosNew,price,total:price*litrosNew,station,receipt,date:fecha,resp,origen:origenNew,modificadoPor:currentUser.nombre||currentUser.username,fechaModif:now()};
+      const updated={...rec,cisternaId,liters:litrosNew,price,total:price*litrosNew,station,receipt,date:fecha,resp,modificadoPor:currentUser.nombre||currentUser.username,fechaModif:now()};
       await api({action:'updateRecarga',data:JSON.stringify(updated)});
       Object.assign(rec,updated);
       // Ajustar nivel cisterna por la diferencia
@@ -2076,15 +2031,6 @@ async function guardarEditMovimiento(){
           await api({action:'updateCisterna',id:cisternaId,value:newLevel});
           cist.current=newLevel;
         }
-      }
-      // Ajustar saldo estación solo por la parte que salió de la estación
-      const consumoEstAntes=origenAntes==='estacion'?litrosOrig:0;
-      const consumoEstNew=origenNew==='estacion'?litrosNew:0;
-      const diffSaldo=consumoEstNew-consumoEstAntes;
-      if(diffSaldo!==0){
-        const newSaldo=Math.max(0,parseFloat(((S.estacion_saldo?.litros||0)-diffSaldo).toFixed(2)));
-        await api({action:'updateEstacionSaldo',value:newSaldo});
-        S.estacion_saldo={litros:newSaldo};
       }
     } else {
       // Depósito estación
@@ -2137,13 +2083,6 @@ async function eliminarRecargaDeposito(id, fuente){
         const newLevel=Math.max(0,parseFloat((totalRecargado-totalDespachado).toFixed(2)));
         await api({action:'updateCisterna',id:mov.cisternaId,value:newLevel});
         cist.current=newLevel;
-      }
-      // Preguntar si devolver litros al saldo estación (solo si la recarga salió de la estación)
-      const saldoActual=S.estacion_saldo?.litros||0;
-      if(origenRecarga(mov)==='estacion'&&confirm(`¿Devolver ${litros.toFixed(0)} L al saldo de la estación?\nSaldo actual: ${saldoActual.toFixed(0)} L → pasaría a ${(saldoActual+litros).toFixed(0)} L`)){
-        const newSaldo=parseFloat((saldoActual+litros).toFixed(2));
-        await api({action:'updateEstacionSaldo',value:newSaldo});
-        S.estacion_saldo={litros:newSaldo};
       }
     } else {
       await api({action:'deleteDeposito',id});
